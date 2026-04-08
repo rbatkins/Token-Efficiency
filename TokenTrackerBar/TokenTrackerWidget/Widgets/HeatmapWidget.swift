@@ -50,7 +50,10 @@ struct HeatmapWidgetView: View {
                 }
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(WidgetFormat.compact(snap.last30d.tokens))
+                // Show all-time tokens so the number lines up with the
+                // all-time active-days count shown next to it.
+                let totalTokens = snap.total.tokens > 0 ? snap.total.tokens : snap.last30d.tokens
+                Text(WidgetFormat.compact(totalTokens))
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundColor(.primary)
                     .monospacedDigit()

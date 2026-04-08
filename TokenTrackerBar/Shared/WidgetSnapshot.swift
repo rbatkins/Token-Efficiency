@@ -27,7 +27,7 @@ public enum WidgetSharedConstants {
     public static let snapshotFilename = "widget-snapshot.json"
 
     /// Schema version — bump when the wire format changes incompatibly.
-    public static let snapshotSchemaVersion = 1
+    public static let snapshotSchemaVersion = 2
 }
 
 // MARK: - Snapshot
@@ -40,6 +40,10 @@ public struct WidgetSnapshot: Codable, Equatable {
     public var today: PeriodTotals
     public var last7d: PeriodTotals
     public var last30d: PeriodTotals
+    /// All-time total across every day the user has tracked. Populated from
+    /// the dashboard's "Total" range so widgets can show the lifetime number
+    /// alongside the all-time active-days count on the heatmap.
+    public var total: PeriodTotals
     /// Whatever period the dashboard is currently showing (week / month / total)
     public var selected: PeriodTotals
 
@@ -67,6 +71,7 @@ public struct WidgetSnapshot: Codable, Equatable {
         today: PeriodTotals = .empty,
         last7d: PeriodTotals = .empty,
         last30d: PeriodTotals = .empty,
+        total: PeriodTotals = .empty,
         selected: PeriodTotals = .empty,
         dailyTrend: [DailyPoint] = [],
         topModels: [SnapshotModelEntry] = [],
@@ -80,6 +85,7 @@ public struct WidgetSnapshot: Codable, Equatable {
         self.today = today
         self.last7d = last7d
         self.last30d = last30d
+        self.total = total
         self.selected = selected
         self.dailyTrend = dailyTrend
         self.topModels = topModels
@@ -122,6 +128,7 @@ public struct WidgetSnapshot: Codable, Equatable {
             today: PeriodTotals(tokens: 1_240_000, costUsd: 0.83, conversations: 12),
             last7d: PeriodTotals(tokens: 8_320_000, costUsd: 5.41, conversations: 64, activeDays: 6),
             last30d: PeriodTotals(tokens: 31_700_000, costUsd: 21.22, conversations: 248, activeDays: 22),
+            total: PeriodTotals(tokens: 4_900_000_000, costUsd: 3_210.55, conversations: 1_820, activeDays: 202),
             selected: PeriodTotals(tokens: 22_900_000, costUsd: 15.10, conversations: 180),
             dailyTrend: trend,
             topModels: [

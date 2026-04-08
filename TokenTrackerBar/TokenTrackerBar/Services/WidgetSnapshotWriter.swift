@@ -25,6 +25,7 @@ enum WidgetSnapshotWriter {
         let todaySummary: UsageSummaryResponse?
         let summary: UsageSummaryResponse?
         let rollingSummary: UsageSummaryResponse?
+        let totalSummary: UsageSummaryResponse?
         let daily: [DailyEntry]
         let topModels: [TopModel]
         let fleetData: [FleetEntry]
@@ -43,6 +44,7 @@ enum WidgetSnapshotWriter {
             todaySummary: vm.todaySummary,
             summary: vm.summary,
             rollingSummary: vm.rollingSummary,
+            totalSummary: vm.totalSummary,
             daily: vm.daily,
             topModels: vm.topModels,
             fleetData: vm.fleetData,
@@ -95,12 +97,18 @@ enum WidgetSnapshotWriter {
         var last30d = rollingTotals(from: inputs.rollingSummary?.rolling.last30d)
         last30d.costUsd = cost30d
 
+        // All-time total — pair the tokens/cost with the heatmap's all-time
+        // active-days so widgets can show a consistent "lifetime" row.
+        var total = periodTotals(from: inputs.totalSummary)
+        total.activeDays = inputs.heatmap?.activeDays ?? total.activeDays
+
         return WidgetSnapshot(
             generatedAt: Date(),
             serverOnline: inputs.serverOnline,
             today: periodTotals(from: inputs.todaySummary),
             last7d: last7d,
             last30d: last30d,
+            total: total,
             selected: periodTotals(from: inputs.summary),
             dailyTrend: trendPoints(from: inputs.daily),
             topModels: topModelEntries(from: inputs.topModels),

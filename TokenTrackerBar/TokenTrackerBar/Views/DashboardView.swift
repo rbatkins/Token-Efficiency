@@ -26,7 +26,9 @@ struct DashboardView: View {
                                 last7dTokens: viewModel.last7dTokens,
                                 last7dActiveDays: viewModel.last7dActiveDays,
                                 last30dTokens: viewModel.last30dTokens,
-                                last30dAvgPerDay: viewModel.last30dAvgPerDay
+                                last30dAvgPerDay: viewModel.last30dAvgPerDay,
+                                totalTokens: viewModel.totalTokens,
+                                totalCost: viewModel.totalCost
                             )
                             UsageLimitsView(limits: viewModel.usageLimits)
                             ActivityHeatmapView(heatmap: viewModel.heatmap)

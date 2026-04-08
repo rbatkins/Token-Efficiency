@@ -38,6 +38,7 @@ class DashboardViewModel: ObservableObject {
     @Published var todaySummary: UsageSummaryResponse?
     @Published var summary: UsageSummaryResponse?
     @Published var rollingSummary: UsageSummaryResponse?
+    @Published var totalSummary: UsageSummaryResponse?
     @Published var daily: [DailyEntry] = []
     @Published var monthly: [MonthlyEntry] = []
     @Published var hourly: [HourlyEntry] = []
@@ -70,6 +71,10 @@ class DashboardViewModel: ObservableObject {
     var last30dTokens: Int { rollingSummary?.rolling.last30d.totals.billableTotalTokens ?? 0 }
     var last30dAvgPerDay: Int { rollingSummary?.rolling.last30d.avgPerActiveDay ?? 0 }
 
+    // All-time total (matches dashboard "Total" period)
+    var totalTokens: Int { totalSummary?.totals.totalTokens ?? 0 }
+    var totalCost: String { TokenFormatter.formatCostFromString(totalSummary?.totals.totalCostUsd) }
+
     // MARK: - Period Switching
 
     func switchPeriod(_ newPeriod: DateHelpers.Period) {
@@ -96,10 +101,11 @@ class DashboardViewModel: ObservableObject {
         let range = DateHelpers.rangeForPeriod(period)
         let rollingFrom = DateHelpers.daysAgoString(30)
         let rollingTo = DateHelpers.todayString()
+        let totalRange = DateHelpers.rangeForPeriod(.total)
 
         var errorCount = 0
         var firstError: String?
-        let totalFetches = 8
+        let totalFetches = 9
 
         await withTaskGroup(of: Void.self) { group in
             // Today summary (always today for summary cards)
@@ -125,6 +131,15 @@ class DashboardViewModel: ObservableObject {
             group.addTask { @MainActor in
                 do {
                     self.rollingSummary = try await APIClient.shared.fetchSummary(from: rollingFrom, to: rollingTo)
+                } catch {
+                    errorCount += 1
+                    if firstError == nil { firstError = error.localizedDescription }
+                }
+            }
+            // All-time total summary (matches dashboard "Total" range)
+            group.addTask { @MainActor in
+                do {
+                    self.totalSummary = try await APIClient.shared.fetchSummary(from: totalRange.from, to: totalRange.to)
                 } catch {
                     errorCount += 1
                     if firstError == nil { firstError = error.localizedDescription }

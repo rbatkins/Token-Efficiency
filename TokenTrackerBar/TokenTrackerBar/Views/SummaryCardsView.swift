@@ -7,9 +7,11 @@ struct SummaryCardsView: View {
     let last7dActiveDays: Int
     let last30dTokens: Int
     let last30dAvgPerDay: Int
+    let totalTokens: Int
+    let totalCost: String
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             StatCard(
                 title: Strings.todayTitle,
                 value: TokenFormatter.formatCompact(todayTokens),
@@ -26,6 +28,12 @@ struct SummaryCardsView: View {
                 title: Strings.thirtyDayTitle,
                 value: TokenFormatter.formatCompact(last30dTokens),
                 subtitle: "~\(TokenFormatter.formatCompact(last30dAvgPerDay))\(Strings.perDay)"
+            )
+
+            StatCard(
+                title: Strings.totalTitle,
+                value: TokenFormatter.formatCompact(totalTokens),
+                subtitle: totalCost
             )
         }
     }
