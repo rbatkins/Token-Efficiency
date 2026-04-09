@@ -4,6 +4,7 @@ import {
   BarChart3,
   Gauge,
   Trophy,
+  LayoutGrid,
   Settings as SettingsIcon,
   ChevronLeft,
   ChevronRight,
@@ -32,6 +33,7 @@ function getNavGroups() {
       items: [
         { id: "usage", to: "/dashboard", icon: BarChart3, label: copy("nav.usage") },
         { id: "limits", to: "/limits", icon: Gauge, label: copy("nav.limits") },
+        { id: "widgets", to: "/widgets", icon: LayoutGrid, label: copy("nav.widgets") },
         { id: "leaderboard", to: "/leaderboard", icon: Trophy, label: copy("nav.leaderboard") },
       ],
     },

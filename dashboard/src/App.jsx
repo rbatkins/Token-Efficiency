@@ -46,6 +46,12 @@ const SettingsPage = React.lazy(() =>
   })),
 );
 
+const WidgetsPage = React.lazy(() =>
+  import("./pages/WidgetsPage.jsx").then((mod) => ({
+    default: mod.WidgetsPage,
+  })),
+);
+
 export default function App() {
   const location = useLocation();
   const insforge = useInsforgeAuth();
@@ -107,6 +113,10 @@ export default function App() {
   if (isSettingsPath) {
     gate = "dashboard";
   }
+  const isWidgetsPath = normalizedPath === "/widgets";
+  if (isWidgetsPath) {
+    gate = "dashboard";
+  }
 
   const PageComponent = leaderboardProfileUserId
     ? LeaderboardProfilePage
@@ -116,7 +126,9 @@ export default function App() {
         ? LimitsPage
         : isSettingsPath
           ? SettingsPage
-          : DashboardPage;
+          : isWidgetsPath
+            ? WidgetsPage
+            : DashboardPage;
 
   // /leaderboard/u/:id (LeaderboardProfilePage) still ships its own
   // min-h-screen + sticky header/footer chrome, so it must NOT be wrapped
@@ -129,7 +141,8 @@ export default function App() {
       normalizedPath === "/" ||
       isLeaderboardIndexPath ||
       isLimitsPath ||
-      isSettingsPath);
+      isSettingsPath ||
+      isWidgetsPath);
 
   const loadingShell = <div className="min-h-screen bg-oai-white dark:bg-[#050505]" />;
 

@@ -227,6 +227,35 @@ dashboard.upgrade_alert.ignore,ui,UpgradeAlertModal,UpgradeAlertModal,ignore,"Di
 dashboard.widgets.title,dashboard,DashboardPage,WidgetOnboardingCard,title,"Desktop Widgets",,active
 dashboard.widgets.hint,dashboard,DashboardPage,WidgetOnboardingCard,hint,"Right-click your desktop → Edit Widgets → search ""TokenTracker""",,active
 dashboard.widgets.dismiss_aria,dashboard,DashboardPage,WidgetOnboardingCard,dismiss_aria,"Dismiss widget intro",,active
+widgets.page.title,dashboard,WidgetsPage,WidgetsPage,title,"Desktop Widgets",,active
+widgets.page.subtitle,dashboard,WidgetsPage,WidgetsPage,subtitle,"Keep an eye on your AI token usage right from your desktop. TokenTracker ships four native macOS widgets you can add to any space.",,active
+widgets.section.catalog,dashboard,WidgetsPage,WidgetsPage,section_catalog,"Available widgets",,active
+widgets.section.activate,dashboard,WidgetsPage,WidgetsPage,section_activate,"How to add them",,active
+widgets.section.tips,dashboard,WidgetsPage,WidgetsPage,section_tips,"Tips",,active
+widgets.summary.name,dashboard,WidgetsPage,WidgetsPage,summary_name,"Usage",,active
+widgets.summary.description,dashboard,WidgetsPage,WidgetsPage,summary_desc,"Today's tokens at a glance, with trend sparkline and hero number.",,active
+widgets.summary.sizes,dashboard,WidgetsPage,WidgetsPage,summary_sizes,"Medium",,active
+widgets.heatmap.name,dashboard,WidgetsPage,WidgetsPage,heatmap_name,"Activity Heatmap",,active
+widgets.heatmap.description,dashboard,WidgetsPage,WidgetsPage,heatmap_desc,"GitHub-style daily activity calendar so you can spot streaks and quiet days at a glance.",,active
+widgets.heatmap.sizes,dashboard,WidgetsPage,WidgetsPage,heatmap_sizes,"Medium",,active
+widgets.topModels.name,dashboard,WidgetsPage,WidgetsPage,topmodels_name,"Top Models",,active
+widgets.topModels.description,dashboard,WidgetsPage,WidgetsPage,topmodels_desc,"Your highest-usage models ranked by token volume — see where your budget is going.",,active
+widgets.topModels.sizes,dashboard,WidgetsPage,WidgetsPage,topmodels_sizes,"Medium",,active
+widgets.limits.name,dashboard,WidgetsPage,WidgetsPage,limits_name,"Usage Limits",,active
+widgets.limits.description,dashboard,WidgetsPage,WidgetsPage,limits_desc,"Live rate-limit progress for Claude, Codex, Cursor, Gemini, Kiro and more.",,active
+widgets.limits.sizes,dashboard,WidgetsPage,WidgetsPage,limits_sizes,"Medium",,active
+widgets.activate.step1.title,dashboard,WidgetsPage,WidgetsPage,step1_title,"Install the TokenTracker menu bar app",,active
+widgets.activate.step1.desc,dashboard,WidgetsPage,WidgetsPage,step1_desc,"Widgets ship inside the macOS app. Download the DMG from the GitHub releases page, drag it to Applications, and launch it once so the system can register the widgets.",,active
+widgets.activate.step2.title,dashboard,WidgetsPage,WidgetsPage,step2_title,"Open the widget gallery",,active
+widgets.activate.step2.desc,dashboard,WidgetsPage,WidgetsPage,step2_desc,"Right-click an empty area of your desktop and choose ""Edit Widgets"", or click the date/time in the menu bar to open Notification Center and tap ""Edit Widgets"" at the bottom.",,active
+widgets.activate.step3.title,dashboard,WidgetsPage,WidgetsPage,step3_title,"Search for TokenTracker",,active
+widgets.activate.step3.desc,dashboard,WidgetsPage,WidgetsPage,step3_desc,"in the gallery search bar. All four widgets will appear under the TokenTracker section.",,active
+widgets.activate.step4.title,dashboard,WidgetsPage,WidgetsPage,step4_title,"Pick a size and drop it in place",,active
+widgets.activate.step4.desc,dashboard,WidgetsPage,WidgetsPage,step4_desc,"Swipe between sizes, then drag the widget onto your desktop or into Notification Center. Done — it starts updating immediately.",,active
+widgets.tips.refresh,dashboard,WidgetsPage,WidgetsPage,tip_refresh,"Widgets refresh automatically every few minutes — no manual sync required.",,active
+widgets.tips.stack,dashboard,WidgetsPage,WidgetsPage,tip_stack,"Stack several sizes together to build a custom dashboard on your desktop.",,active
+widgets.tips.sizes,dashboard,WidgetsPage,WidgetsPage,tip_sizes,"Each size is purpose-built: Small surfaces one hero number, Large shows all the context.",,active
+widgets.tips.menubar,dashboard,WidgetsPage,WidgetsPage,tip_menubar,"Keep the menu bar app running in the background so widgets always have fresh data.",,active
 dashboard.cost_breakdown.title,ui,CostAnalysisModal,CostAnalysisModal,title,"Cost Breakdown",,active
 dashboard.cost_breakdown.total_label,ui,CostAnalysisModal,CostAnalysisModal,total_label,"Estimated Total Cost",,active
 dashboard.cost_breakdown.calc_prefix,ui,CostAnalysisModal,CostAnalysisModal,calc_prefix,"CALC:",,deprecated
@@ -459,6 +488,7 @@ live_sniffer.event.hooking,ui,LiveSniffer,LiveSniffer,event,"> HOOKING: AI_CLI_P
 live_sniffer.event.capture,ui,LiveSniffer,LiveSniffer,event,"> CAPTURE: +128 NEURAL_TOKENS",,active
 nav.usage,shared,*,Sidebar,nav_usage,"Tokens",,active
 nav.limits,shared,*,Sidebar,nav_limits,"Limits",,active
+nav.widgets,shared,*,Sidebar,nav_widgets,"Widgets",,active
 nav.leaderboard,shared,*,Sidebar,nav_leaderboard,"Leaderboard",,active
 nav.collapse,shared,*,Sidebar,nav_collapse,"Collapse sidebar",,active
 nav.expand,shared,*,Sidebar,nav_expand,"Expand sidebar",,active
