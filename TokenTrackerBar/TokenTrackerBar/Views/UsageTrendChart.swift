@@ -226,12 +226,7 @@ struct UsageTrendChartWrapper: View {
 				onPeriodChange: onPeriodChange
 			)
 		} else {
-			VStack(alignment: .leading, spacing: 14) {
-				SectionHeader(title: Strings.trendTitle) {
-					PeriodPickerView(selection: $period, onChange: onPeriodChange)
-				}
-				PlaceholderBlock(height: 140, hint: "Charts require macOS 13+")
-			}
+			EmptyView()
 		}
 	}
 }
