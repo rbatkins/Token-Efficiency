@@ -13,6 +13,7 @@ import { WidgetOnboardingCard } from "../components/WidgetOnboardingCard.jsx";
 export function DashboardView(props) {
   const {
     copy,
+    onOpenShare,
     screenshotMode,
     showExpiredGate,
     showAuthGate,
@@ -225,6 +226,7 @@ export function DashboardView(props) {
                   fleetData={fleetData}
                   onRefresh={screenshotMode ? null : refreshAll}
                   loading={usageLoadingState}
+                  onOpenShare={screenshotMode ? null : onOpenShare}
                   customFrom={customFrom}
                   customTo={customTo}
                   onCustomRangeApply={onCustomRangeApply}

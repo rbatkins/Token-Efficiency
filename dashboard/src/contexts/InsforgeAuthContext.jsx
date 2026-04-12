@@ -2,8 +2,22 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { getOrCreateInsforgeClient, isCloudInsforgeConfigured } from "../lib/insforge-config";
 import { clearCloudDeviceSession } from "../lib/cloud-sync-prefs";
 import { isLikelyExpiredAccessToken } from "../lib/auth-token";
+import { getPublicVisibility } from "../lib/api";
 
 const InsforgeAuthContext = createContext(null);
+
+/** Pick a human-readable name from the InsForge user object (OAuth metadata). */
+function pickDisplayNameFromUser(user) {
+  if (!user || typeof user !== "object") return "";
+  const meta = user.user_metadata && typeof user.user_metadata === "object" ? user.user_metadata : {};
+  const prof = user.profile && typeof user.profile === "object" ? user.profile : {};
+  const n = meta.full_name || meta.name || prof.name || meta.user_name || meta.preferred_username;
+  if (typeof n === "string" && n.trim()) return n.trim();
+  if (typeof user.email === "string" && user.email.includes("@")) {
+    return user.email.split("@")[0].trim() || user.email.trim();
+  }
+  return typeof user.email === "string" ? user.email.trim() : "";
+}
 
 /** 从 refresh 响应体取 token（SDK 可能只写 http 头、或字段名/嵌套与 saveSession 不一致） */
 function accessTokenFromRefreshPayload(data) {
@@ -193,6 +207,40 @@ export function InsforgeAuthProvider({ children }) {
     return resolveInsforgeClientAccessToken(client);
   }, [client]);
 
+  // Unified display name: cloud custom name > OAuth provider name.
+  // Fetched once when user signs in; updated via refreshDisplayName().
+  const [cloudDisplayName, setCloudDisplayName] = useState(null);
+  const authDisplayName = useMemo(() => pickDisplayNameFromUser(user), [user]);
+
+  useEffect(() => {
+    if (!user || !client) {
+      setCloudDisplayName(null);
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const token = await resolveInsforgeClientAccessToken(client);
+        if (!active || !token) return;
+        const data = await getPublicVisibility({ accessToken: token });
+        if (active && data?.display_name) setCloudDisplayName(data.display_name);
+      } catch { /* ignore */ }
+    })();
+    return () => { active = false; };
+  }, [user, client]);
+
+  const displayName = cloudDisplayName || authDisplayName;
+
+  const refreshDisplayName = useCallback(async () => {
+    if (!client) return;
+    try {
+      const token = await resolveInsforgeClientAccessToken(client);
+      if (!token) return;
+      const data = await getPublicVisibility({ accessToken: token });
+      if (data?.display_name) setCloudDisplayName(data.display_name);
+    } catch { /* ignore */ }
+  }, [client]);
+
   const value = useMemo(() => {
     if (!isCloudInsforgeConfigured() || !client) {
       return {
@@ -201,7 +249,9 @@ export function InsforgeAuthProvider({ children }) {
         user: null,
         signedIn: false,
         loading: false,
+        displayName: "",
         refreshUser: async () => {},
+        refreshDisplayName: async () => {},
         signInWithOAuth: async () => ({ error: new Error("InsForge not configured") }),
         signInWithPassword: async () => ({ data: null, error: new Error("InsForge not configured") }),
         signUp: async () => ({ data: null, error: new Error("InsForge not configured") }),
@@ -216,7 +266,9 @@ export function InsforgeAuthProvider({ children }) {
       user,
       signedIn: Boolean(user),
       loading,
+      displayName,
       refreshUser,
+      refreshDisplayName,
       signInWithOAuth,
       signInWithPassword,
       signUp,
@@ -228,7 +280,9 @@ export function InsforgeAuthProvider({ children }) {
     client,
     user,
     loading,
+    displayName,
     refreshUser,
+    refreshDisplayName,
     signInWithOAuth,
     signInWithPassword,
     signUp,

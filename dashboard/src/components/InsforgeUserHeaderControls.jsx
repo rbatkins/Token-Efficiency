@@ -1,23 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInsforgeAuth } from "../contexts/InsforgeAuthContext.jsx";
 import { useLoginModal } from "../contexts/LoginModalContext.jsx";
-import { resolveAuthAccessTokenWithRetry } from "../lib/auth-token";
-import { getPublicVisibility } from "../lib/api";
 import { copy } from "../lib/copy";
 import { cn } from "../lib/cn";
-
-function pickDisplayName(user) {
-  if (!user || typeof user !== "object") return "";
-  const meta = user.user_metadata && typeof user.user_metadata === "object" ? user.user_metadata : {};
-  const prof = user.profile && typeof user.profile === "object" ? user.profile : {};
-  const n = meta.full_name || meta.name || prof.name || meta.user_name || meta.preferred_username;
-  if (typeof n === "string" && n.trim()) return n.trim();
-  if (typeof user.email === "string" && user.email.includes("@")) {
-    return user.email.split("@")[0].trim() || user.email.trim();
-  }
-  return typeof user.email === "string" ? user.email.trim() : "";
-}
 
 function pickAvatarUrl(user) {
   if (!user || typeof user !== "object") return null;
@@ -41,32 +27,10 @@ function initialsFromName(name) {
  */
 export function InsforgeUserHeaderControls({ className, variant = "header", collapsed = false, onAfterAction }) {
   const isSidebar = variant === "sidebar";
-  const { enabled, loading, signedIn, user, getAccessToken } = useInsforgeAuth();
+  const { enabled, loading, signedIn, user, displayName } = useInsforgeAuth();
   const { openLoginModal } = useLoginModal();
   const navigate = useNavigate();
-  const [customDisplayName, setCustomDisplayName] = useState(null);
-
-  const displayName = useMemo(() => pickDisplayName(user), [user]);
   const avatarUrl = useMemo(() => pickAvatarUrl(user), [user]);
-
-  // Fetch the cloud-side custom display name (if any) so the sidebar matches Settings.
-  useEffect(() => {
-    if (!signedIn) return;
-    let active = true;
-    (async () => {
-      try {
-        const token = await resolveAuthAccessTokenWithRetry({ getAccessToken });
-        if (!active || !token) return;
-        const data = await getPublicVisibility({ accessToken: token });
-        if (active && data?.display_name) setCustomDisplayName(data.display_name);
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [signedIn, getAccessToken]);
 
   if (!enabled) return null;
 
@@ -145,7 +109,7 @@ export function InsforgeUserHeaderControls({ className, variant = "header", coll
             : "flex items-center gap-2 rounded-full pl-1 pr-2 py-1 border border-transparent hover:bg-oai-gray-100 dark:hover:bg-oai-gray-900/80 hover:border-oai-gray-200 dark:hover:border-oai-gray-800 transition-colors",
         )}
         aria-label={copy("header.auth.open_settings")}
-        title={isSidebar && collapsed ? (customDisplayName || displayName) : undefined}
+        title={isSidebar && collapsed ? (displayName) : undefined}
       >
         {isSidebar ? (
           <span className="flex h-5 w-5 shrink-0 items-center justify-center">
@@ -181,12 +145,12 @@ export function InsforgeUserHeaderControls({ className, variant = "header", coll
         {isSidebar ? (
           !collapsed && (
             <span className="truncate text-[13px] font-medium text-oai-gray-900 dark:text-oai-gray-200 flex-1 text-left min-w-0">
-              {customDisplayName || displayName}
+              {displayName}
             </span>
           )
         ) : (
           <span className="hidden sm:inline truncate text-sm font-medium text-oai-gray-900 dark:text-oai-gray-200 max-w-[120px]">
-            {customDisplayName || displayName}
+            {displayName}
           </span>
         )}
       </button>

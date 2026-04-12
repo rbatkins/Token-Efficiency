@@ -41,6 +41,8 @@ import { MatrixButton } from "../ui/foundation/MatrixButton.jsx";
 import { ActivityHeatmap } from "../ui/matrix-a/components/ActivityHeatmap.jsx";
 import { ProjectUsagePanel } from "../ui/matrix-a/components/ProjectUsagePanel.jsx";
 import { DashboardView } from "../ui/matrix-a/views/DashboardView.jsx";
+import { ShareModal } from "../ui/share/ShareModal";
+import { useShareCardData } from "../ui/share/use-share-card-data";
 
 const PERIODS = ["day", "week", "month", "total", "custom"];
 const DETAILS_DATE_KEYS = new Set(["day", "hour", "month"]);
@@ -134,6 +136,7 @@ export function DashboardPage({
   }, []);
   const forceInstall = useMemo(() => isForceInstallEnabled(), []);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
   const identityScrambleDurationMs = 2200;
   const [coreIndexCollapsed, setCoreIndexCollapsed] = useState(true);
   const [installCopied, setInstallCopied] = useState(false);
@@ -1099,6 +1102,23 @@ export function DashboardPage({
     [modelBreakdown],
   );
 
+  const shareCardData = useShareCardData({
+    enabled: shareModalOpen,
+    handle: identityDisplayName,
+    startDate: identityStartDate,
+    activeDays,
+    summary,
+    topModels,
+    period,
+    periodFrom: from,
+    periodTo: to,
+    heatmap,
+    accessToken: typeof accessToken === "string" ? accessToken : null,
+    userId: auth?.userId || null,
+  });
+  const openShareModal = useCallback(() => setShareModalOpen(true), []);
+  const closeShareModal = useCallback(() => setShareModalOpen(false), []);
+
   const openCostModal = useCallback(() => setCostModalOpen(true), []);
   const closeCostModal = useCallback(() => setCostModalOpen(false), []);
   const costInfoEnabled = summaryCostValue && summaryCostValue !== "-" && fleetData.length > 0;
@@ -1166,8 +1186,10 @@ export function DashboardPage({
   const showAuthGate = requireAuthGate && !publicMode;
 
   return (
+    <>
     <DashboardView
       copy={copy}
+      onOpenShare={openShareModal}
       screenshotMode={screenshotMode}
       showExpiredGate={showExpiredGate}
       showAuthGate={showAuthGate}
@@ -1260,5 +1282,12 @@ export function DashboardPage({
       costModalOpen={costModalOpen}
       closeCostModal={closeCostModal}
     />
+    <ShareModal
+      open={shareModalOpen}
+      onClose={closeShareModal}
+      data={shareCardData}
+      twitterText={screenshotTwitterText}
+    />
+    </>
   );
 }

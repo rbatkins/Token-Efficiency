@@ -92,6 +92,8 @@ export default function App() {
     if (!insforge.enabled || !cloudAuthSignedIn) return null;
     return {
       getAccessToken: () => insforge.getAccessToken(),
+      name: insforge.displayName || "",
+      userId: insforge.user?.id || null,
     };
   }, [insforge, cloudAuthSignedIn]);
 

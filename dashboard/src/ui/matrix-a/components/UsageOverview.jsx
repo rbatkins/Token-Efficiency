@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "motion/react";
-import { Info, Trophy } from "lucide-react";
+import { Info, SquareArrowOutUpRight } from "lucide-react";
 import { Popover } from "@base-ui/react/popover";
 import { Card, Button, Counter } from "../../openai/components";
 import { FadeIn } from "../../foundation/FadeIn.jsx";
@@ -79,6 +78,7 @@ export function UsageOverview({
   onCustomRangeApply,
   customRangeOpen,
   onCustomRangeOpenChange,
+  onOpenShare,
 }) {
   const tabs = normalizePeriods(periods);
   const summaryCounterValue = parseAnimatedCounterValue(String(summaryValue ?? ""));
@@ -163,13 +163,16 @@ export function UsageOverview({
             })}
           </div>
           <div className="flex items-center gap-1.5">
-            <Link
-              to="/leaderboard"
-              className="inline-flex items-center justify-center gap-1.5 h-8 px-3 text-xs font-medium rounded-md no-underline border border-oai-gray-300 dark:border-oai-gray-700 bg-oai-white dark:bg-oai-gray-900 text-oai-black dark:text-oai-white hover:border-oai-brand hover:text-oai-brand transition-colors duration-200"
-            >
-              <Trophy className="h-3.5 w-3.5" strokeWidth={2} />
-              Leaderboard
-            </Link>
+{onOpenShare ? (
+              <button
+                type="button"
+                onClick={onOpenShare}
+                className="inline-flex items-center justify-center gap-1.5 h-8 px-3 text-xs font-medium rounded-md border border-oai-gray-300 dark:border-oai-gray-700 bg-oai-white dark:bg-oai-gray-900 text-oai-black dark:text-oai-white hover:border-oai-brand hover:text-oai-brand transition-colors duration-200"
+              >
+                <SquareArrowOutUpRight className="h-3.5 w-3.5" strokeWidth={2} />
+                Share
+              </button>
+            ) : null}
             {onRefresh && (
               <RefreshButton loading={loading} onClick={onRefresh} />
             )}

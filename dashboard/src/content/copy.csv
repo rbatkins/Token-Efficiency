@@ -460,7 +460,7 @@ dashboard.screenshot.title_line2,dashboard,DashboardPage,ScreenshotTitle,title_l
 dashboard.screenshot.twitter_button,dashboard,DashboardPage,ScreenshotShare,button_label,"Share on X",,active
 dashboard.screenshot.twitter_label,dashboard,DashboardPage,ScreenshotShare,aria_label,"Share on X",,active
 dashboard.screenshot.twitter_hint,dashboard,DashboardPage,ScreenshotShare,helper_text,"Auto-copies image to clipboard",,active
-dashboard.screenshot.twitter_text,dashboard,DashboardPage,ScreenshotShare,share_text,"This year\nI handed {{total_tokens}} tokens to Coding Agent\n\nThe one that stayed with me until the end\nwas {{agent_name}}\n\n{{model_name}} usage: {{model_percent}}%\n\nData: TokenTracker @victor_wu_eth\n\nRun in your terminal:\nnpx --yes tokentracker-cli init\n(Paste Image Stats with CMD / CTRL + V)",,active
+dashboard.screenshot.twitter_text,dashboard,DashboardPage,ScreenshotShare,share_text,"{{total_tokens}} tokens on the record.\n{{model_name}} led with {{model_percent}}%.\n\nMy AI usage, unaudited →\ntoken.rynn.me",,active
 
 live_sniffer.log.system,ui,LiveSniffer,LiveSniffer,log,"[SYSTEM] KERNEL_LINK_ESTABLISHED",,active
 live_sniffer.log.socket,ui,LiveSniffer,LiveSniffer,log,"[SOCKET] LISTENING_ON_LOCAL_CLI_PIPE...",,active
@@ -532,3 +532,20 @@ settings.menubar.syncing,ui,SettingsPage,SettingsPage,mb_syncing,"Syncing…",,a
 settings.menubar.updates,ui,SettingsPage,SettingsPage,mb_updates,"Updates",,active
 settings.menubar.updatesHint,ui,SettingsPage,SettingsPage,mb_updates_hint,"Check GitHub for a newer release.",,active
 settings.menubar.checkUpdates,ui,SettingsPage,SettingsPage,mb_check_updates,"Check for updates",,active
+share.modal.title,share,DashboardPage,ShareModal,title,"Share your stats",,active
+share.modal.subtitle,share,DashboardPage,ShareModal,subtitle,"Generate a poster-style card and share anywhere.",,active
+share.modal.close,share,DashboardPage,ShareModal,close,"Close",,active
+share.modal.action.x,share,DashboardPage,ShareModal,action_x,"Share on X",,active
+share.modal.action.download,share,DashboardPage,ShareModal,action_download,"Download",,active
+share.modal.action.copy,share,DashboardPage,ShareModal,action_copy,"Copy image",,active
+share.modal.hint.x,share,DashboardPage,ShareModal,hint_x,"Paste image in tweet",,active
+share.modal.hint.copy,share,DashboardPage,ShareModal,hint_copy,"to clipboard",,active
+share.modal.name_label,share,DashboardPage,ShareModal,name_label,"Display name",,active
+share.modal.name_placeholder,share,DashboardPage,ShareModal,name_placeholder,"Enter your name",,active
+share.modal.footer,share,DashboardPage,ShareModal,footer,"Your data stays local — images are generated in your browser and never uploaded.",,active
+share.button.label,share,DashboardPage,DashboardHeader,share_button,"Share",,active
+share.button.aria,share,DashboardPage,DashboardHeader,share_button_aria,"Open share card",,active
+share.toast.copied,share,DashboardPage,ShareModal,toast_copied,"Image copied to clipboard",,active
+share.toast.downloaded,share,DashboardPage,ShareModal,toast_downloaded,"Image saved",,active
+share.toast.failed,share,DashboardPage,ShareModal,toast_failed,"Couldn't generate image",,active
+share.toast.working,share,DashboardPage,ShareModal,toast_working,"Generating…",,active
