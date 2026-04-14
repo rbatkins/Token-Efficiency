@@ -123,7 +123,8 @@ final class DashboardWindowController: NSObject, NSWindowDelegate, WKNavigationD
             dragBar.topAnchor.constraint(equalTo: container.topAnchor),
             dragBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             dragBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            dragBar.heightAnchor.constraint(equalToConstant: 56),
+            // 必须与 dashboard `AppLayout` 顶部 `h-7`（28pt）拖拽条对齐；设过高会盖住 sidebar 顶部的 Sign in 按钮，mouseDown 被 performDrag 吃掉。
+            dragBar.heightAnchor.constraint(equalToConstant: 28),
             overlay.topAnchor.constraint(equalTo: container.topAnchor),
             overlay.bottomAnchor.constraint(equalTo: container.bottomAnchor),
             overlay.leadingAnchor.constraint(equalTo: container.leadingAnchor),
