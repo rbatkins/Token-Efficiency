@@ -3,7 +3,14 @@ import { isAccessTokenReady, resolveAuthAccessToken } from "../lib/auth-token";
 import { formatDateLocal, formatDateUTC } from "../lib/date-range";
 import { isMockEnabled } from "../lib/mock-data";
 import { getLocalDayKey, getTimeZoneCacheKey } from "../lib/timezone";
-import { getUsageDaily, getUsageHourly, getUsageMonthly } from "../lib/api";
+import {
+  fetchCloudUsageDaily,
+  fetchCloudUsageHourly,
+  fetchCloudUsageMonthly,
+  getUsageDaily,
+  getUsageHourly,
+  getUsageMonthly,
+} from "../lib/api";
 
 const DEFAULT_MONTHS = 24;
 type AnyRecord = Record<string, any>;
@@ -22,7 +29,11 @@ export function useTrendData({
   now,
   sharedRows,
   sharedRange,
+  accountView = false,
+  accountAccessToken = null,
+  accountRevision = 0,
 }: any = {}) {
+  const useCloud = Boolean(accountView && accountAccessToken);
   const [rows, setRows] = useState<any[]>([]);
   const [range, setRange] = useState<{ from?: any; to?: any }>(() => ({ from, to }));
   const [source, setSource] = useState<string>("edge");
@@ -46,16 +57,17 @@ export function useTrendData({
     if (!cacheKey) return null;
     const host = safeHost(baseUrl) || "default";
     const tzKey = getTimeZoneCacheKey({ timeZone, offsetMinutes: tzOffsetMinutes });
+    const scope = useCloud ? "cloud" : "local";
     if (mode === "hourly") {
       const dayKey = to || from || "day";
-      return `tokentracker.trend.${cacheKey}.${host}.hourly.${dayKey}.${tzKey}`;
+      return `tokentracker.trend.${cacheKey}.${scope}.${host}.hourly.${dayKey}.${tzKey}`;
     }
     if (mode === "monthly") {
       const toKey = to || "today";
-      return `tokentracker.trend.${cacheKey}.${host}.monthly.${months}.${toKey}.${tzKey}`;
+      return `tokentracker.trend.${cacheKey}.${scope}.${host}.monthly.${months}.${toKey}.${tzKey}`;
     }
     const rangeKey = `${from || ""}.${to || ""}`;
-    return `tokentracker.trend.${cacheKey}.${host}.daily.${rangeKey}.${tzKey}`;
+    return `tokentracker.trend.${cacheKey}.${scope}.${host}.daily.${rangeKey}.${tzKey}`;
   })();
 
   const readCache = useCallback(() => {
@@ -106,33 +118,37 @@ export function useTrendData({
       return;
     }
     const resolvedToken = await resolveAuthAccessToken(accessToken);
-    if (!resolvedToken && !mockEnabled && !isLocalMode) return;
+    if (!resolvedToken && !mockEnabled && !isLocalMode && !useCloud) return;
     setLoading(true);
     setError(null);
     try {
+      const tokenForFetch = useCloud ? accountAccessToken : resolvedToken;
+      const hourlyFetcher = useCloud ? fetchCloudUsageHourly : getUsageHourly;
+      const monthlyFetcher = useCloud ? fetchCloudUsageMonthly : getUsageMonthly;
+      const dailyFetcher = useCloud ? fetchCloudUsageDaily : getUsageDaily;
       let response;
       if (mode === "hourly") {
         const day = to || from;
-        response = await getUsageHourly({
+        response = await hourlyFetcher({
           baseUrl,
-          accessToken: resolvedToken,
+          accessToken: tokenForFetch,
           day,
           timeZone,
           tzOffsetMinutes,
         });
       } else if (mode === "monthly") {
-        response = await getUsageMonthly({
+        response = await monthlyFetcher({
           baseUrl,
-          accessToken: resolvedToken,
+          accessToken: tokenForFetch,
           months,
           to,
           timeZone,
           tzOffsetMinutes,
         });
       } else {
-        response = await getUsageDaily({
+        response = await dailyFetcher({
           baseUrl,
-          accessToken: resolvedToken,
+          accessToken: tokenForFetch,
           from,
           to,
           timeZone,
@@ -253,6 +269,9 @@ export function useTrendData({
     clearCache,
     writeCache,
     isLocalMode,
+    useCloud,
+    accountAccessToken,
+    accountRevision,
   ]);
 
   useEffect(() => {
@@ -265,7 +284,7 @@ export function useTrendData({
       setError(null);
       return;
     }
-    if (!tokenReady && !guestAllowed && !mockEnabled && !isLocalMode) {
+    if (!tokenReady && !guestAllowed && !mockEnabled && !isLocalMode && !useCloud) {
       setRows([]);
       setRange({ from, to });
       setError(null);

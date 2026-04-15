@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useAccountView } from "../contexts/AccountViewContext.jsx";
+import { useInsforgeAuth } from "../contexts/InsforgeAuthContext.jsx";
 import { useActivityHeatmap } from "../hooks/use-activity-heatmap.js";
 import { useProjectUsageSummary } from "../hooks/use-project-usage-summary";
 import { useTrendData } from "../hooks/use-trend-data.js";
@@ -126,6 +128,27 @@ export function DashboardPage({
   const [linkCodeExpiryTick, setLinkCodeExpiryTick] = useState(0);
   const [linkCodeRefreshToken, setLinkCodeRefreshToken] = useState(0);
   const [userStatus, setUserStatus] = useState(null);
+  const { accountView, revision: accountRevision } = useAccountView();
+  const insforgeAuth = useInsforgeAuth();
+  const [accountAccessToken, setAccountAccessToken] = useState(null);
+  useEffect(() => {
+    if (!accountView || !insforgeAuth?.enabled || !insforgeAuth?.signedIn) {
+      setAccountAccessToken(null);
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const token = await insforgeAuth.getAccessToken();
+        if (active) setAccountAccessToken(typeof token === "string" && token ? token : null);
+      } catch {
+        if (active) setAccountAccessToken(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [accountView, accountRevision, insforgeAuth]);
   const [compactSummary, setCompactSummary] = useState(() => {
     if (typeof window === "undefined" || !window.matchMedia) return false;
     return window.matchMedia("(max-width: 640px)").matches;
@@ -398,6 +421,9 @@ export function DashboardPage({
     timeZone,
     tzOffsetMinutes,
     now: mockNow,
+    accountView,
+    accountAccessToken,
+    accountRevision,
   });
   const {
     daily: dailyBreakdownDaily,
@@ -414,6 +440,9 @@ export function DashboardPage({
     timeZone,
     tzOffsetMinutes,
     now: mockNow,
+    accountView,
+    accountAccessToken,
+    accountRevision,
   });
 
   const {
@@ -429,6 +458,9 @@ export function DashboardPage({
     cacheKey,
     timeZone,
     tzOffsetMinutes,
+    accountView,
+    accountAccessToken,
+    accountRevision,
   });
 
   const [projectUsageLimit, setProjectUsageLimit] = useState(3);
@@ -475,6 +507,9 @@ export function DashboardPage({
     now: mockNow,
     sharedRows: shareDailyToTrend ? daily : null,
     sharedRange: shareDailyToTrend ? { from, to } : null,
+    accountView,
+    accountAccessToken,
+    accountRevision,
   });
 
   const {
@@ -491,6 +526,9 @@ export function DashboardPage({
     timeZone,
     tzOffsetMinutes,
     now: mockNow,
+    accountView,
+    accountAccessToken,
+    accountRevision,
   });
 
   const {
@@ -744,13 +782,18 @@ export function DashboardPage({
       if (isLocalMode) {
         await triggerLocalSync();
       }
+      // Account-wide view depends on the cloud having received the latest
+      // batch. Give the indexing pipeline ~3s before invalidating queries.
+      if (accountView) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
       await refreshAll();
     } catch (error) {
       console.error("[DashboardPage] Refresh failed:", error);
     } finally {
       setManualSyncLoading(false);
     }
-  }, [isLocalMode, refreshAll]);
+  }, [isLocalMode, refreshAll, accountView]);
 
   const usageLoadingState =
     manualSyncLoading ||
@@ -1281,6 +1324,8 @@ export function DashboardPage({
       setDetailsPage={setDetailsPage}
       costModalOpen={costModalOpen}
       closeCostModal={closeCostModal}
+      accountView={accountView}
+      accountViewBadgeLabel={accountView ? copy("dashboard.account_view.badge") : ""}
     />
     <ShareModal
       open={shareModalOpen}
