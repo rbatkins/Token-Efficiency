@@ -288,13 +288,8 @@ export function UsageOverview({
                     <div className="text-lg font-semibold text-oai-black dark:text-oai-white tabular-nums">
                       {provider.totalPercent}%
                     </div>
-                    <div className="flex items-baseline justify-between gap-2 mt-0.5 text-[11px] text-oai-gray-400 dark:text-oai-gray-400 tabular-nums">
-                      <span className="truncate">
-                        {provider.models.length} {provider.models.length === 1 ? "model" : "models"}
-                      </span>
-                      <span className="shrink-0 whitespace-nowrap">
-                        {[formatTokens(provider.usage), formatCost(provider.usd)].filter(Boolean).join(" · ")}
-                      </span>
+                    <div className="mt-0.5 text-[11px] text-oai-gray-400 dark:text-oai-gray-400 tabular-nums">
+                      {provider.models.length} {provider.models.length === 1 ? "model" : "models"}
                     </div>
                   </button>
                 );
