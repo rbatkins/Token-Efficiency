@@ -117,21 +117,43 @@ function resolveQueuePath() {
 }
 
 function readQueueData(queuePath) {
+  let raw;
   try {
-    const raw = fs.readFileSync(queuePath, "utf8");
-    const lines = raw.split("\n").filter((l) => l.trim());
-    const parsed = lines.map((l) => JSON.parse(l));
-    // Deduplicate: each sync appends cumulative totals per bucket, so for
-    // each (source, model, hour_start) keep only the latest (last) entry.
-    const seen = new Map();
-    for (const row of parsed) {
-      const key = `${row.source || ""}|${row.model || ""}|${row.hour_start || ""}`;
-      seen.set(key, row);
+    raw = fs.readFileSync(queuePath, "utf8");
+  } catch (e) {
+    // ENOENT is legitimate (never synced yet); anything else is a signal we
+    // don't want to hide behind an empty array forever — the dashboard would
+    // otherwise render "0 tokens" with no clue the queue was unreadable.
+    if (e?.code !== "ENOENT") {
+      console.error("[LocalAPI] readQueueData: failed to read queue:", e?.message || e);
     }
-    return Array.from(seen.values());
-  } catch (_e) {
     return [];
   }
+  const lines = raw.split("\n").filter((l) => l.trim());
+  // Parse row-by-row so a single corrupted line (partial write, disk-full
+  // truncation, …) does not wipe out every other row with it.
+  const parsed = [];
+  let malformed = 0;
+  for (const line of lines) {
+    try {
+      parsed.push(JSON.parse(line));
+    } catch {
+      malformed += 1;
+    }
+  }
+  if (malformed > 0) {
+    console.error(
+      `[LocalAPI] readQueueData: skipped ${malformed}/${lines.length} malformed line(s) in ${queuePath}`,
+    );
+  }
+  // Deduplicate: each sync appends cumulative totals per bucket, so for
+  // each (source, model, hour_start) keep only the latest (last) entry.
+  const seen = new Map();
+  for (const row of parsed) {
+    const key = `${row.source || ""}|${row.model || ""}|${row.hour_start || ""}`;
+    seen.set(key, row);
+  }
+  return Array.from(seen.values());
 }
 
 function rowDayKey(row, timeZoneContext) {
