@@ -328,18 +328,25 @@ export default async function (req: Request): Promise<Response> {
 
     // --- Fetch user settings for public/anonymous flags ---
     const userIds = Array.from(aggMap.keys());
-    const settingsMap = new Map<string, { leaderboard_public: boolean; leaderboard_anonymous: boolean }>();
+    type UserSettingsRow = {
+      user_id: string;
+      leaderboard_public: boolean;
+      leaderboard_anonymous: boolean;
+      github_url: string | null;
+      show_github_url: boolean;
+    };
+    const settingsMap = new Map<string, UserSettingsRow>();
 
     // Fetch in batches of 100 (IN filter limit)
     for (let i = 0; i < userIds.length; i += 100) {
       const batch = userIds.slice(i, i + 100);
       const { data: settings } = await client.database
         .from("tokentracker_user_settings")
-        .select("user_id, leaderboard_public, leaderboard_anonymous")
+        .select("user_id, leaderboard_public, leaderboard_anonymous, github_url, show_github_url")
         .in("user_id", batch);
 
       if (settings) {
-        for (const s of settings as { user_id: string; leaderboard_public: boolean; leaderboard_anonymous: boolean }[]) {
+        for (const s of settings as UserSettingsRow[]) {
           settingsMap.set(s.user_id, s);
         }
       }
@@ -391,6 +398,12 @@ export default async function (req: Request): Promise<Response> {
       const profile = userProfiles.get(userId);
       const displayName = isAnonymous ? "Anonymous" : (profile?.display_name ?? "Anonymous");
       const avatarUrl = isAnonymous ? null : (profile?.avatar_url ?? null);
+      // Only surface github_url on the public snapshot when the user opted in
+      // AND isn't in anonymous mode — anonymous takes precedence over any
+      // identifying link.
+      const githubUrl = !isAnonymous && settings?.show_github_url && settings?.github_url
+        ? settings.github_url
+        : null;
 
       return {
         user_id: userId,
@@ -413,6 +426,7 @@ export default async function (req: Request): Promise<Response> {
         estimated_cost_usd: Math.round(agg.estimated_cost_usd * 100) / 100,
         display_name: displayName,
         avatar_url: avatarUrl,
+        github_url: githubUrl,
         is_public: isPublic,
         generated_at: generatedAt,
       };

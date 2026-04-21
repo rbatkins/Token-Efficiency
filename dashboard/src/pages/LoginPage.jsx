@@ -97,6 +97,14 @@ export function LoginPage() {
     };
   }, [enabled, getPublicAuthConfig]);
 
+  const isNativeLogin = useMemo(() => {
+    return searchParams.get("native") === "1";
+  }, [searchParams]);
+
+  const autoProvider = useMemo(() => {
+    return searchParams.get("provider") || null;
+  }, [searchParams]);
+
   useEffect(() => {
     if (!enabled || authLoading) return;
     if (signedIn) {
@@ -113,14 +121,6 @@ export function LoginPage() {
     if (!enabled) return;
     refreshUser();
   }, [enabled, refreshUser]);
-
-  const isNativeLogin = useMemo(() => {
-    return searchParams.get("native") === "1";
-  }, [searchParams]);
-
-  const autoProvider = useMemo(() => {
-    return searchParams.get("provider") || null;
-  }, [searchParams]);
 
   const redirectAfterOAuth = useMemo(() => {
     if (typeof window === "undefined") return "";

@@ -100,7 +100,7 @@ export default async function (req: Request): Promise<Response> {
   if (req.method === "GET") {
     const { data } = await client.database
       .from("tokentracker_user_settings")
-      .select("leaderboard_public, leaderboard_anonymous, updated_at")
+      .select("leaderboard_public, leaderboard_anonymous, github_url, show_github_url, updated_at")
       .eq("user_id", userId)
       .maybeSingle();
     const { data: pv } = await client.database
@@ -120,6 +120,8 @@ export default async function (req: Request): Promise<Response> {
       share_token: pv?.token_hash || null,
       updated_at: data?.updated_at || null,
       display_name: profile?.display_name || null,
+      github_url: data?.github_url || null,
+      show_github_url: data?.show_github_url || false,
     });
   }
   if (req.method === "POST") {
@@ -127,17 +129,49 @@ export default async function (req: Request): Promise<Response> {
       enabled?: boolean;
       anonymous?: boolean;
       display_name?: string;
+      github_url?: string | null;
+      show_github_url?: boolean;
     };
     const now = new Date().toISOString();
 
-    // Update settings (enabled / anonymous)
-    if (body.enabled !== undefined || body.anonymous !== undefined) {
+    // Validate github_url (optional). Accept public GitHub profile URLs only —
+    // any host/path shape that isn't a bare user/org page is rejected so we
+    // don't render arbitrary external links next to names on the leaderboard.
+    // `null` / empty string explicitly clears the value.
+    let normalizedGithubUrl: string | null | undefined = undefined;
+    if (body.github_url !== undefined) {
+      if (body.github_url === null || (typeof body.github_url === "string" && body.github_url.trim() === "")) {
+        normalizedGithubUrl = null;
+      } else if (typeof body.github_url === "string") {
+        const raw = body.github_url.trim();
+        // Allow bare handle, "@handle", or full URL. Normalize to canonical URL.
+        const handleMatch = raw.match(/^@?([A-Za-z0-9][A-Za-z0-9-]{0,38})$/);
+        const urlMatch = raw.match(/^https:\/\/github\.com\/([A-Za-z0-9][A-Za-z0-9-]{0,38})\/?$/i);
+        if (handleMatch) {
+          normalizedGithubUrl = `https://github.com/${handleMatch[1]}`;
+        } else if (urlMatch) {
+          normalizedGithubUrl = `https://github.com/${urlMatch[1]}`;
+        } else {
+          return json({ error: "Invalid GitHub URL. Use https://github.com/<username> or a bare username." }, 400);
+        }
+      }
+    }
+
+    // Update settings (enabled / anonymous / github_url / show_github_url)
+    if (
+      body.enabled !== undefined ||
+      body.anonymous !== undefined ||
+      normalizedGithubUrl !== undefined ||
+      body.show_github_url !== undefined
+    ) {
       const upsertRow: Record<string, unknown> = {
         user_id: userId,
         updated_at: now,
       };
       if (body.enabled !== undefined) upsertRow.leaderboard_public = Boolean(body.enabled);
       if (body.anonymous !== undefined) upsertRow.leaderboard_anonymous = Boolean(body.anonymous);
+      if (normalizedGithubUrl !== undefined) upsertRow.github_url = normalizedGithubUrl;
+      if (body.show_github_url !== undefined) upsertRow.show_github_url = Boolean(body.show_github_url);
       await client.database.from("tokentracker_user_settings").upsert(
         upsertRow,
         { onConflict: "user_id" },
@@ -161,6 +195,8 @@ export default async function (req: Request): Promise<Response> {
     if (body.enabled !== undefined) result.enabled = Boolean(body.enabled);
     if (body.anonymous !== undefined) result.anonymous = Boolean(body.anonymous);
     if (typeof body.display_name === "string") result.display_name = body.display_name.trim().slice(0, 50) || null;
+    if (normalizedGithubUrl !== undefined) result.github_url = normalizedGithubUrl;
+    if (body.show_github_url !== undefined) result.show_github_url = Boolean(body.show_github_url);
     return json(result);
   }
   return json({ error: "Method not allowed" }, 405);

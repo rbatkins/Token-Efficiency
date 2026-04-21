@@ -523,6 +523,15 @@ settings.account.publicProfile,ui,SettingsPage,SettingsPage,public_profile,"Publ
 settings.account.publicProfileHint,ui,SettingsPage,SettingsPage,public_profile_hint,"Show your usage on the public leaderboard.",,active
 settings.account.anonymous,ui,SettingsPage,SettingsPage,anonymous,"Anonymous",,active
 settings.account.anonymousHint,ui,SettingsPage,SettingsPage,anonymous_hint,"Hide your name and avatar from the leaderboard.",,active
+settings.account.displayNameAnonymousHint,ui,SettingsPage,SettingsPage,display_name_anon_hint,"Anonymous — your name and avatar are hidden on the leaderboard",,active
+settings.account.displayNameDisabledWhileAnon,ui,SettingsPage,SettingsPage,display_name_disabled,"Turn on the switch first to edit your name",,active
+settings.account.githubUrl,ui,SettingsPage,SettingsPage,github_url,"GitHub profile",,active
+settings.account.githubUrlHint,ui,SettingsPage,SettingsPage,github_url_hint,"Show a GitHub link next to your name on the leaderboard.",,active
+settings.account.githubUrlPlaceholder,ui,SettingsPage,SettingsPage,github_url_placeholder,"username or https://github.com/username",,active
+settings.account.githubUrlInvalid,ui,SettingsPage,SettingsPage,github_url_invalid,"Use a GitHub username or https://github.com/username URL.",,active
+leaderboard.github.aria,ui,LeaderboardPage,LeaderboardPage,github_aria,"Open GitHub profile",,active
+leaderboard.github.tooltipPrefix,ui,LeaderboardPage,LeaderboardPage,github_tooltip_prefix,"Add yours in",,active
+leaderboard.github.tooltipSettingsLink,ui,LeaderboardPage,LeaderboardPage,github_tooltip_link,"Settings",,active
 settings.account.signOut,ui,SettingsPage,SettingsPage,sign_out,"Sign out",,active
 settings.account.signIn,ui,SettingsPage,SettingsPage,sign_in,"Sign in",,active
 settings.account.signedOutHint,ui,SettingsPage,SettingsPage,signed_out_hint,"Sign in to manage cloud sync and leaderboard preferences.",,active

@@ -184,11 +184,21 @@ export async function getPublicVisibility({ accessToken }: AnyRecord = {}) {
   });
 }
 
-export async function setPublicVisibility({ accessToken, enabled, anonymous, display_name }: AnyRecord = {}) {
+export async function setPublicVisibility({
+  accessToken,
+  enabled,
+  anonymous,
+  display_name,
+  github_url,
+  show_github_url,
+}: AnyRecord = {}) {
   const body: AnyRecord = {};
   if (enabled !== undefined) body.enabled = Boolean(enabled);
   if (anonymous !== undefined) body.anonymous = Boolean(anonymous);
   if (display_name !== undefined) body.display_name = String(display_name);
+  // null is a valid value (clears the URL), so check for presence via `in`-style
+  if (github_url !== undefined) body.github_url = github_url === null ? null : String(github_url);
+  if (show_github_url !== undefined) body.show_github_url = Boolean(show_github_url);
   return fetchInsforgeFunction("tokentracker-public-visibility", {
     accessToken,
     method: "POST",

@@ -149,6 +149,11 @@ function AccountSection() {
   const [customDisplayName, setCustomDisplayName] = useState(null);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
+  const [showGithubOn, setShowGithubOn] = useState(false);
+  const [githubUrl, setGithubUrl] = useState("");
+  const [githubInput, setGithubInput] = useState("");
+  const [editingGithub, setEditingGithub] = useState(false);
+  const [githubError, setGithubError] = useState(null);
 
   const showLocalCloudSync = enabled && signedIn && isLocalDashboardHost();
   const displayName = useMemo(() => pickDisplayName(user), [user]);
@@ -168,6 +173,8 @@ function AccountSection() {
         setPublicProfileOn(Boolean(data?.enabled));
         setAnonymousOn(Boolean(data?.anonymous));
         if (data?.display_name) setCustomDisplayName(data.display_name);
+        setShowGithubOn(Boolean(data?.show_github_url));
+        setGithubUrl(data?.github_url || "");
       } catch {
         /* ignore */
       } finally {
@@ -246,6 +253,87 @@ function AccountSection() {
     setNameInput(customDisplayName || displayName);
     setEditingName(true);
   }, [customDisplayName, displayName]);
+
+  const handleShowGithubToggle = useCallback(async () => {
+    if (profileSaving) return;
+    // Turning the toggle on without a saved URL isn't useful — nudge the user
+    // to enter one first instead of saving an enabled flag that renders nothing.
+    if (!showGithubOn && !githubUrl) {
+      setEditingGithub(true);
+      setGithubInput("");
+      setGithubError(null);
+      return;
+    }
+    setProfileSaving(true);
+    try {
+      const token = await resolveAuthAccessTokenWithRetry({ getAccessToken });
+      if (!token) return;
+      const next = !showGithubOn;
+      await setPublicVisibility({ accessToken: token, show_github_url: next });
+      setShowGithubOn(next);
+    } catch {
+      /* ignore */
+    } finally {
+      setProfileSaving(false);
+    }
+  }, [showGithubOn, githubUrl, profileSaving, getAccessToken]);
+
+  const handleSaveGithub = useCallback(async () => {
+    if (profileSaving) return;
+    const raw = githubInput.trim();
+    // Empty input = clear saved URL (and disable the toggle).
+    if (!raw) {
+      setProfileSaving(true);
+      try {
+        const token = await resolveAuthAccessTokenWithRetry({ getAccessToken });
+        if (!token) return;
+        await setPublicVisibility({ accessToken: token, github_url: null, show_github_url: false });
+        setGithubUrl("");
+        setShowGithubOn(false);
+        setEditingGithub(false);
+        setGithubError(null);
+      } finally {
+        setProfileSaving(false);
+      }
+      return;
+    }
+    // Mirror the server-side validator so users get fast feedback without
+    // a round-trip; server still has final say.
+    const handleMatch = raw.match(/^@?([A-Za-z0-9][A-Za-z0-9-]{0,38})$/);
+    const urlMatch = raw.match(/^https:\/\/github\.com\/([A-Za-z0-9][A-Za-z0-9-]{0,38})\/?$/i);
+    const handle = handleMatch?.[1] || urlMatch?.[1];
+    if (!handle) {
+      setGithubError(copy("settings.account.githubUrlInvalid"));
+      return;
+    }
+    const canonical = `https://github.com/${handle}`;
+    setProfileSaving(true);
+    setGithubError(null);
+    try {
+      const token = await resolveAuthAccessTokenWithRetry({ getAccessToken });
+      if (!token) return;
+      // Save the URL and auto-enable the toggle — saving a URL implicitly
+      // means the user wants it shown.
+      const res = await setPublicVisibility({
+        accessToken: token,
+        github_url: canonical,
+        show_github_url: true,
+      });
+      setGithubUrl(res?.github_url || canonical);
+      setShowGithubOn(true);
+      setEditingGithub(false);
+    } catch (err) {
+      setGithubError(err?.message || copy("settings.account.githubUrlInvalid"));
+    } finally {
+      setProfileSaving(false);
+    }
+  }, [githubInput, profileSaving, getAccessToken]);
+
+  const startEditingGithub = useCallback(() => {
+    setGithubInput(githubUrl || "");
+    setGithubError(null);
+    setEditingGithub(true);
+  }, [githubUrl]);
 
   if (!enabled) return null;
 
@@ -332,7 +420,9 @@ function AccountSection() {
                   </div>
                   {!editingName && (
                     <div className="mt-0.5 text-xs text-oai-gray-500 dark:text-oai-gray-400 truncate">
-                      {customDisplayName || displayName}
+                      {anonymousOn
+                        ? copy("settings.account.displayNameAnonymousHint")
+                        : (customDisplayName || displayName)}
                     </div>
                   )}
                   {editingName && (
@@ -369,30 +459,100 @@ function AccountSection() {
                   )}
                 </div>
                 {!editingName && (
-                  <button
-                    type="button"
-                    onClick={startEditingName}
-                    className="shrink-0 inline-flex h-8 items-center gap-1.5 rounded-md border border-oai-gray-200 dark:border-oai-gray-800 px-3 text-xs font-medium text-oai-gray-700 dark:text-oai-gray-300 hover:bg-oai-gray-100 dark:hover:bg-oai-gray-800 transition-colors"
-                  >
-                    <Pencil className="h-3.5 w-3.5" aria-hidden />
-                    {copy("settings.account.edit")}
-                  </button>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={startEditingName}
+                      disabled={anonymousOn}
+                      title={anonymousOn ? copy("settings.account.displayNameDisabledWhileAnon") : undefined}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-oai-gray-200 dark:border-oai-gray-800 px-3 text-xs font-medium text-oai-gray-700 dark:text-oai-gray-300 hover:bg-oai-gray-100 dark:hover:bg-oai-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Pencil className="h-3.5 w-3.5" aria-hidden />
+                      {copy("settings.account.edit")}
+                    </button>
+                    <ToggleSwitch
+                      checked={!anonymousOn}
+                      onChange={handleAnonymousToggle}
+                      disabled={profileLoading || profileSaving}
+                      ariaLabel={copy("settings.account.displayName")}
+                    />
+                  </div>
                 )}
               </div>
             </div>
 
-            <SettingsRow
-              label={copy("settings.account.anonymous")}
-              hint={copy("settings.account.anonymousHint")}
-              control={
-                <ToggleSwitch
-                  checked={anonymousOn}
-                  onChange={handleAnonymousToggle}
-                  disabled={profileLoading || profileSaving}
-                  ariaLabel={copy("settings.account.anonymous")}
-                />
-              }
-            />
+            <div className="py-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-oai-gray-900 dark:text-oai-gray-200">
+                    {copy("settings.account.githubUrl")}
+                  </div>
+                  {!editingGithub && (
+                    <div className="mt-0.5 text-xs text-oai-gray-500 dark:text-oai-gray-400 truncate">
+                      {githubUrl || copy("settings.account.githubUrlHint")}
+                    </div>
+                  )}
+                  {editingGithub && (
+                    <>
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={githubInput}
+                          onChange={(e) => {
+                            setGithubInput(e.target.value);
+                            if (githubError) setGithubError(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveGithub();
+                            if (e.key === "Escape") { setEditingGithub(false); setGithubError(null); }
+                          }}
+                          maxLength={100}
+                          autoFocus
+                          className="flex-1 rounded-md border border-oai-gray-300 dark:border-oai-gray-700 bg-transparent px-2.5 py-1.5 text-sm text-oai-black dark:text-white outline-none focus:border-oai-brand-500 focus:ring-1 focus:ring-inset focus:ring-oai-brand-500"
+                          placeholder={copy("settings.account.githubUrlPlaceholder")}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveGithub}
+                          disabled={profileSaving}
+                          className="rounded-md bg-oai-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-oai-brand-600 disabled:opacity-50 transition-colors"
+                        >
+                          {profileSaving ? copy("settings.account.saving") : copy("settings.account.save")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setEditingGithub(false); setGithubError(null); }}
+                          className="rounded-md px-2 py-1.5 text-xs text-oai-gray-500 hover:text-oai-gray-700 dark:hover:text-oai-gray-300 transition-colors"
+                        >
+                          {copy("settings.account.cancel")}
+                        </button>
+                      </div>
+                      {githubError && (
+                        <div className="mt-1.5 text-xs text-red-600 dark:text-red-400">{githubError}</div>
+                      )}
+                    </>
+                  )}
+                </div>
+                {!editingGithub && (
+                  <div className="shrink-0 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={startEditingGithub}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-oai-gray-200 dark:border-oai-gray-800 px-3 text-xs font-medium text-oai-gray-700 dark:text-oai-gray-300 hover:bg-oai-gray-100 dark:hover:bg-oai-gray-800 transition-colors"
+                    >
+                      <Pencil className="h-3.5 w-3.5" aria-hidden />
+                      {copy("settings.account.edit")}
+                    </button>
+                    <ToggleSwitch
+                      checked={showGithubOn}
+                      onChange={handleShowGithubToggle}
+                      disabled={profileLoading || profileSaving}
+                      ariaLabel={copy("settings.account.githubUrl")}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

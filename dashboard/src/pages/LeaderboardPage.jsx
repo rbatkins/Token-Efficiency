@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { useInsforgeAuth } from "../contexts/InsforgeAuthContext.jsx";
 import { useLoginModal } from "../contexts/LoginModalContext.jsx";
+import { ProviderIcon } from "../ui/matrix-a/components/ProviderIcon.jsx";
 import { isAccessTokenReady, resolveAuthAccessTokenWithRetry } from "../lib/auth-token";
 import { copy } from "../lib/copy";
 import { toDisplayNumber } from "../lib/format";
@@ -137,6 +138,59 @@ function leaderboardAvatarSeed(entry, displayName) {
   const id = typeof entry?.user_id === "string" ? entry.user_id.trim() : "";
   if (id) return id;
   return `${entry?.rank ?? ""}:${displayName}`;
+}
+
+/**
+ * Small GitHub icon that expands into a tooltip on hover. The tooltip carries a
+ * clickable "Settings" link so users who haven't configured their own GitHub yet
+ * know where to turn it on. Uses a named Tailwind group (`group/gh`) so hover
+ * state is scoped to this span — leaderboard rows already have their own
+ * `group` for row-hover backgrounds and we don't want to collide.
+ */
+function GithubLinkWithTooltip({ githubUrl }) {
+  return (
+    <span className="relative inline-flex items-center group/gh shrink-0">
+      <a
+        href={githubUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        aria-label={copy("leaderboard.github.aria")}
+        className="text-oai-black hover:text-oai-gray-500 dark:text-white dark:hover:text-oai-gray-400 transition-colors"
+      >
+        <ProviderIcon provider="GITHUB" size={16} />
+      </a>
+      <span
+        role="tooltip"
+        // Render above the icon so the next row's sticky <td> can't cover the
+        // tooltip (later rows paint higher in the stacking order). left-0 keeps
+        // it inside the user column.
+        //
+        // CRITICAL for hover persistence:
+        //  1. NO margin between tooltip and icon. A margin is dead space — the
+        //     cursor leaves the group bounding box while traveling across it,
+        //     hover breaks, tooltip disappears mid-motion.
+        //  2. NO pointer-events-none on the tooltip. It's a descendant of the
+        //     group; :hover must reach it for group-hover to stay true.
+        //  3. ::before bridge extends the tooltip's hit-area down to the
+        //     icon's top edge so the cursor's path from icon up into the
+        //     tooltip text stays inside the group the whole time.
+        // mb-2 creates the visual 8px gap users expect; ::before h-2.5 (10px)
+        // bridges that gap for hit-testing so the cursor never leaves the
+        // group while moving from icon into the tooltip.
+        className="invisible opacity-0 group-hover/gh:visible group-hover/gh:opacity-100 absolute left-0 bottom-full mb-2 whitespace-nowrap rounded-md bg-oai-black dark:bg-oai-gray-700 px-2.5 py-1.5 text-[11px] text-white shadow-lg transition-opacity duration-150 z-50 before:content-[''] before:absolute before:inset-x-0 before:top-full before:h-2.5"
+      >
+        {copy("leaderboard.github.tooltipPrefix")}{" "}
+        <Link
+          to="/settings"
+          onClick={(e) => e.stopPropagation()}
+          className="underline underline-offset-2 decoration-oai-gray-400 hover:text-oai-brand-300 hover:decoration-oai-brand-300"
+        >
+          {copy("leaderboard.github.tooltipSettingsLink")}
+        </Link>
+      </span>
+    </span>
+  );
 }
 
 export function LeaderboardPage({
@@ -402,13 +456,15 @@ export function LeaderboardPage({
                       <RankCell rank={entry?.rank} placeholder={placeholder} />
                     </td>
                     <td className={lbStickyTdUser(true)}>
-                      <div className="flex min-w-0 max-w-[min(160px,40vw)] items-center gap-4">
+                      <div className="flex min-w-0 items-center gap-2">
                         <LeaderboardAvatar
                           avatarUrl={entry?.avatar_url}
                           displayName={name}
                           seed={leaderboardAvatarSeed(entry, name)}
                         />
+                    
                         <span className="truncate font-semibold text-oai-black dark:text-oai-white">{name}</span>
+                            {entry?.github_url && <GithubLinkWithTooltip githubUrl={entry.github_url} />}
                       </div>
                     </td>
                     <td className="px-4 py-4 font-medium text-oai-black dark:text-oai-white whitespace-nowrap text-right tabular-nums bg-oai-brand-50 dark:bg-oai-brand-900/10">
@@ -431,12 +487,13 @@ export function LeaderboardPage({
                     <RankCell rank={entry?.rank} placeholder={placeholder} />
                   </td>
                   <td className={lbStickyTdUser(false)}>
-                    <div className="flex min-w-0 max-w-[min(160px,40vw)] items-center gap-4">
+                    <div className="flex min-w-0 items-center gap-3">
                       <LeaderboardAvatar
                         avatarUrl={entry?.avatar_url}
                         displayName={name}
                         seed={leaderboardAvatarSeed(entry, name)}
                       />
+                      {entry?.github_url && <GithubLinkWithTooltip githubUrl={entry.github_url} />}
                       <span className="truncate font-medium text-oai-gray-800 dark:text-oai-gray-200">{name}</span>
                     </div>
                   </td>
