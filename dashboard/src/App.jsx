@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
-import { LocaleProvider } from "./ui/foundation/LocaleProvider.jsx";
+import { useLocale } from "./hooks/useLocale.js";
 import { ThemeProvider } from "./ui/foundation/ThemeProvider.jsx";
 import { useInsforgeAuth } from "./contexts/InsforgeAuthContext.jsx";
 import { LoginModalProvider } from "./contexts/LoginModalContext.jsx";
@@ -38,6 +38,10 @@ const WidgetsPage = React.lazy(() =>
 const IpCheckPage = React.lazy(() => import("./pages/IpCheckPage.jsx"));
 
 export default function App() {
+  // Subscribing to locale here makes App rerender on language switch, which
+  // rebuilds every child element reference and triggers copy() re-evaluation
+  // across the tree — without unmounting lazy-loaded pages.
+  const { resolvedLocale } = useLocale();
   const location = useLocation();
   const insforge = useInsforgeAuth();
   useCloudUsageSync();
@@ -134,6 +138,7 @@ export default function App() {
     const pageNode = (
       <Suspense fallback={loadingShell}>
         <PageComponent
+          key={resolvedLocale}
           baseUrl={baseUrl}
           auth={authObject}
           signedIn={signedIn}
@@ -152,16 +157,14 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <LocaleProvider>
-        <ThemeProvider>
-          <LoginModalProvider>
-            {content}
-            <LoginModal />
-            <Analytics />
-            <SpeedInsights />
-          </LoginModalProvider>
-        </ThemeProvider>
-      </LocaleProvider>
+      <ThemeProvider>
+        <LoginModalProvider>
+          {content}
+          <LoginModal />
+          <Analytics />
+          <SpeedInsights />
+        </LoginModalProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

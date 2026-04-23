@@ -11,6 +11,7 @@ import {
   resolveAuthAccessToken,
 } from "../lib/auth-token";
 import { copy } from "../lib/copy";
+import { useLocale } from "../hooks/useLocale.js";
 import { getDetailsSortColumns, sortDailyRows } from "../lib/daily";
 import { formatDateUTC, getRangeForPeriod } from "../lib/date-range";
 import { DETAILS_PAGE_SIZE, paginateRows, trimLeadingZeroMonths } from "../lib/details";
@@ -118,6 +119,7 @@ export function DashboardPage({
   signInUrl = "/sign-in",
   signUpUrl = "/sign-up",
 }) {
+  const { resolvedLocale } = useLocale();
   const [costModalOpen, setCostModalOpen] = useState(false);
   const [linkCode, setLinkCode] = useState(null);
   const [linkCodeExpiresAt, setLinkCodeExpiresAt] = useState(null);
@@ -765,7 +767,7 @@ export function DashboardPage({
       copy("shared.data_source", {
         source: String(usageSource || "edge").toUpperCase(),
       }),
-    [usageSource],
+    [usageSource, resolvedLocale],
   );
   const identityRawName = useMemo(() => {
     if (typeof auth?.name !== "string") return "";
@@ -1168,7 +1170,10 @@ export function DashboardPage({
     window.setTimeout(() => setSessionExpiredCopied(false), 2000);
   }, [installInitCmdBase]);
 
-  const dailyEmptyTemplate = useMemo(() => copy("dashboard.daily.empty", { cmd: "{{cmd}}" }), []);
+  const dailyEmptyTemplate = useMemo(
+    () => copy("dashboard.daily.empty", { cmd: "{{cmd}}" }),
+    [resolvedLocale],
+  );
   const [dailyEmptyPrefix, dailyEmptySuffix] = useMemo(() => {
     const parts = dailyEmptyTemplate.split("{{cmd}}");
     if (parts.length === 1) return [dailyEmptyTemplate, ""];

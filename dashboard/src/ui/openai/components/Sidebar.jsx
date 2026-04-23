@@ -18,6 +18,7 @@ import {
 import { copy } from "../../../lib/copy";
 import { cn } from "../../../lib/cn";
 import { useTheme } from "../../../hooks/useTheme.js";
+import { useLocale } from "../../../hooks/useLocale.js";
 import { shouldFetchGithubStars } from "../../matrix-a/util/should-fetch-github-stars.js";
 import { InsforgeUserHeaderControls } from "../../../components/InsforgeUserHeaderControls.jsx";
 import { isNativeApp, isNativeEmbed } from "../../../lib/native-bridge.js";
@@ -305,7 +306,10 @@ function SidebarBody({ collapsed, onToggleCollapsed, onItemClick, showCloseButto
   const location = useLocation();
   const pathname = location?.pathname || "/";
   const { theme, resolvedTheme, setTheme } = useTheme();
-  const navGroups = useMemo(() => getNavGroups(), []);
+  // Re-compute copy() via getNavGroups when locale changes, otherwise the
+  // labels stay stale after a language switch.
+  const { resolvedLocale } = useLocale();
+  const navGroups = useMemo(() => getNavGroups(), [resolvedLocale]);
 
   return (
     <>
