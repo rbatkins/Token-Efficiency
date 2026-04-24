@@ -41,8 +41,11 @@ export function lbStickyTdRank(isMe) {
 }
 
 export function lbStickyTdUser(isMe) {
+  // hover:z-50 lifts the cell above the sticky <th> (z-40) so the GitHub
+  // tooltip — confined to this td's stacking context — can paint over the
+  // table header on row 1.
   return cn(
-    "sticky left-[72px] z-30 min-w-[200px] max-w-[min(260px,45vw)] border-r border-oai-gray-200 dark:border-oai-gray-800 px-4 py-4 min-w-0",
+    "sticky left-[72px] z-30 hover:z-50 min-w-[200px] max-w-[min(260px,45vw)] border-r border-oai-gray-200 dark:border-oai-gray-800 px-4 py-4 min-w-0",
     isMe
       ? "bg-oai-brand-50 dark:bg-emerald-950"
       : "bg-white dark:bg-oai-gray-950 group-hover:bg-oai-gray-50 dark:group-hover:bg-oai-gray-900/60",

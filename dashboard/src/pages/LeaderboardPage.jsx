@@ -179,16 +179,20 @@ function GithubLinkWithTooltip({ githubUrl }) {
         // on the right side of the cell after the name). mb-2 gives an 8px
         // visual gap; ::before h-2.5 (10px) bridges it for hit-testing so the
         // cursor never leaves the group while moving from icon into tooltip.
-        className="invisible opacity-0 group-hover/gh:visible group-hover/gh:opacity-100 absolute right-0 bottom-full mb-2 whitespace-nowrap rounded-md bg-oai-black dark:bg-oai-gray-700 px-2.5 py-1.5 text-[11px] text-white shadow-lg transition-opacity duration-150 z-50 before:content-[''] before:absolute before:inset-x-0 before:top-full before:h-2.5"
+        className="invisible opacity-0 group-hover/gh:visible group-hover/gh:opacity-100 absolute right-0 bottom-full mb-2 whitespace-nowrap rounded-md bg-oai-black dark:bg-oai-gray-700 px-2.5 py-1.5 text-[11px] leading-relaxed text-white shadow-lg transition-opacity duration-150 z-50 before:content-[''] before:absolute before:inset-x-0 before:top-full before:h-2.5"
       >
-        {copy("leaderboard.github.tooltipPrefix")}{" "}
-        <Link
-          to="/settings"
-          onClick={(e) => e.stopPropagation()}
-          className="underline underline-offset-2 decoration-oai-gray-400 hover:text-oai-brand-300 hover:decoration-oai-brand-300"
-        >
-          {copy("leaderboard.github.tooltipSettingsLink")}
-        </Link>
+        <span className="block">{copy("leaderboard.github.tooltipAction")}</span>
+        <span className="block text-oai-gray-300 dark:text-oai-gray-400">
+          {copy("leaderboard.github.tooltipPrefix")}{" "}
+          <Link
+            to="/settings"
+            onClick={(e) => e.stopPropagation()}
+            className="text-white underline underline-offset-2 decoration-oai-gray-400 hover:text-oai-brand-300 hover:decoration-oai-brand-300"
+          >
+            {copy("leaderboard.github.tooltipSettingsLink")}
+          </Link>
+          {copy("leaderboard.github.tooltipSuffix")}
+        </span>
       </span>
     </span>
   );
@@ -402,7 +406,7 @@ export function LeaderboardPage({
                 {copy("leaderboard.column.total")}
               </th>
               <th className="px-4 py-4 text-[11px] font-semibold uppercase tracking-wider text-oai-gray-400 dark:text-oai-gray-500 whitespace-nowrap text-right align-middle" title="Based on estimated API pricing, not actual billing">
-                Est. Cost
+                {copy("leaderboard.column.est_cost")}
               </th>
               <SortableContext items={columnOrder} strategy={horizontalListSortingStrategy}>
                 {orderedColumns.map((col) => (
@@ -586,25 +590,25 @@ export function LeaderboardPage({
 
           {!signedIn && (
             <div className="mb-6 flex items-center justify-between text-sm">
-              <p className="text-oai-gray-500 dark:text-oai-gray-400">Sign in to join the leaderboard</p>
+              <p className="text-oai-gray-500 dark:text-oai-gray-400">{copy("leaderboard.signin_prompt")}</p>
               <button
                 onClick={openLoginModal}
                 className="px-3 py-1.5 text-sm font-medium text-oai-gray-600 dark:text-oai-gray-300 border border-oai-gray-300 dark:border-oai-gray-700 rounded-md hover:text-oai-black dark:hover:text-white hover:border-oai-gray-400 dark:hover:border-oai-gray-600 transition-colors"
               >
-                Sign In
+                {copy("leaderboard.signin_button")}
               </button>
             </div>
           )}
 
           {authTokenAllowed && authTokenReady && !cloudSyncOn && (
             <div className="mb-6 flex items-center justify-between text-sm">
-              <p className="text-oai-gray-500 dark:text-oai-gray-400">Enable Cloud Sync to appear in rankings</p>
+              <p className="text-oai-gray-500 dark:text-oai-gray-400">{copy("leaderboard.sync_prompt")}</p>
               <button
                 onClick={handleEnableSync}
                 disabled={syncing}
                 className="px-3 py-1.5 text-sm font-medium text-oai-gray-600 dark:text-oai-gray-300 border border-oai-gray-300 dark:border-oai-gray-700 rounded-md hover:text-oai-black dark:hover:text-white hover:border-oai-gray-400 dark:hover:border-oai-gray-600 disabled:opacity-50 transition-colors"
               >
-                {syncing ? "Syncing..." : "Enable & Sync"}
+                {syncing ? copy("leaderboard.sync_button.busy") : copy("leaderboard.sync_button.idle")}
               </button>
             </div>
           )}

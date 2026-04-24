@@ -21,6 +21,9 @@ login.field.password,shared,LoginPage,LoginPage,field_password,"Password",,activ
 login.password_hint,shared,LoginPage,LoginPage,pw_hint,"At least {{min}} characters.",,active
 login.submit.sign_in,shared,LoginPage,LoginPage,submit_sign_in,"Sign in with email",,active
 login.submit.sign_up,shared,LoginPage,LoginPage,submit_sign_up,"Create account",,active
+login_modal.subtitle,shared,*,LoginModal,subtitle,"Sign in to join the leaderboard",,active
+login_modal.continue_email,shared,*,LoginModal,continue_email,"Continue with Email",,active
+login_modal.divider_email,shared,*,LoginModal,divider_email,"email",,active
 shared.placeholder.short,shared,*,*,placeholder_short,"--",,active
 shared.placeholder.anon_mark,shared,*,*,placeholder_anon_mark,"?",,active
 shared.unit.percent,shared,*,*,unit_percent,"%",,active
@@ -530,8 +533,26 @@ settings.account.githubUrlHint,ui,SettingsPage,SettingsPage,github_url_hint,"Sho
 settings.account.githubUrlPlaceholder,ui,SettingsPage,SettingsPage,github_url_placeholder,"username or https://github.com/username",,active
 settings.account.githubUrlInvalid,ui,SettingsPage,SettingsPage,github_url_invalid,"Use a GitHub username or https://github.com/username URL.",,active
 leaderboard.github.aria,ui,LeaderboardPage,LeaderboardPage,github_aria,"Open GitHub profile",,active
-leaderboard.github.tooltipPrefix,ui,LeaderboardPage,LeaderboardPage,github_tooltip_prefix,"Add yours in",,active
+auth.callback.processing,ui,*,NativeAuthCallbackPage,processing,"Processing…",,active
+auth.callback.success,ui,*,NativeAuthCallbackPage,success,"Signed in successfully",,active
+auth.callback.redirecting,ui,*,NativeAuthCallbackPage,redirecting,"Returning to TokenTracker…",,active
+auth.callback.failed,ui,*,NativeAuthCallbackPage,failed,"Sign-in incomplete. Please try again.",,active
+auth.callback.close,ui,*,NativeAuthCallbackPage,close,"Close this page",,active
+stats.period.today,ui,DashboardPage,StatsPanel,period_today,"today",,active
+stats.period.week,ui,DashboardPage,StatsPanel,period_week,"week",,active
+stats.period.month,ui,DashboardPage,StatsPanel,period_month,"month",,active
+stats.period.all,ui,DashboardPage,StatsPanel,period_all,"all",,active
+stats.period.convs,ui,DashboardPage,StatsPanel,period_convs,"convs",,active
+leaderboard.column.est_cost,ui,LeaderboardPage,LeaderboardPage,column_est_cost,"Est. Cost",,active
+leaderboard.signin_prompt,ui,LeaderboardPage,LeaderboardPage,signin_prompt,"Sign in to join the leaderboard",,active
+leaderboard.signin_button,ui,LeaderboardPage,LeaderboardPage,signin_button,"Sign In",,active
+leaderboard.sync_prompt,ui,LeaderboardPage,LeaderboardPage,sync_prompt,"Enable Cloud Sync to appear in rankings",,active
+leaderboard.sync_button.idle,ui,LeaderboardPage,LeaderboardPage,sync_button_idle,"Enable & Sync",,active
+leaderboard.sync_button.busy,ui,LeaderboardPage,LeaderboardPage,sync_button_busy,"Syncing...",,active
+leaderboard.github.tooltipAction,ui,LeaderboardPage,LeaderboardPage,github_tooltip_action,"Click to open GitHub profile",,active
+leaderboard.github.tooltipPrefix,ui,LeaderboardPage,LeaderboardPage,github_tooltip_prefix,"Set yours in",,active
 leaderboard.github.tooltipSettingsLink,ui,LeaderboardPage,LeaderboardPage,github_tooltip_link,"Settings",,active
+leaderboard.github.tooltipSuffix,ui,LeaderboardPage,LeaderboardPage,github_tooltip_suffix," to appear here",,active
 settings.account.signOut,ui,SettingsPage,SettingsPage,sign_out,"Sign out",,active
 settings.account.signIn,ui,SettingsPage,SettingsPage,sign_in,"Sign in",,active
 settings.account.signedOutHint,ui,SettingsPage,SettingsPage,signed_out_hint,"Sign in to manage cloud sync and leaderboard preferences.",,active
