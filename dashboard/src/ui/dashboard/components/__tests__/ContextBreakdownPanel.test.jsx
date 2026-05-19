@@ -542,11 +542,12 @@ describe("ContextBreakdownPanel", () => {
 
     render(<ContextBreakdownPanel from="2026-05-09" to="2026-05-09" source="claude" />);
 
-    // tool_calls keeps its bucket-bar percent at 100% (no subtraction)
+    // For Claude, tool_calls is hoisted out of the bar entirely and rendered
+    // as an auxiliary row (same shape as MCP servers / Skills) — no percent.
     const toolCallsRow = (
       await screen.findByText(copy("dashboard.context_breakdown.category.tool_calls"))
     ).closest("li");
-    expect(toolCallsRow).toHaveTextContent("100.0%");
+    expect(toolCallsRow).not.toHaveTextContent("%");
 
     // MCP servers row exists but renders WITHOUT a percent (separate metric)
     const mcpRow = screen
@@ -554,7 +555,7 @@ describe("ContextBreakdownPanel", () => {
       .closest("li");
     expect(mcpRow).not.toHaveTextContent("%");
 
-    // tool_calls disclosure still drills into residual non-MCP categories only
+    // tool_calls disclosure drills into residual non-MCP categories only
     fireEvent.click(
       screen.getByRole("button", { name: copy("dashboard.context_breakdown.category.tool_calls") }),
     );

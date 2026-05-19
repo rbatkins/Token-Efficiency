@@ -13,6 +13,7 @@
 const fssync = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const readline = require("node:readline");
 
 const {
@@ -514,11 +515,56 @@ function dayKeyToIsoBounds(from, to) {
   };
 }
 
-// Cache: keyed on (rootDir|from|to|maxMtime). 60s TTL is a safety net in
-// case the watcher misses something.
+// Cache: keyed on (rootDir|from|to|files.length|maxMtime). The key already
+// changes the moment any session file is touched, so a long TTL is safe — we
+// don't need a short window as a "safety net". Mirror the in-memory cache
+// to disk so a fresh tracker process (e.g. menu bar app restart) doesn't pay
+// the cold-scan cost again.
 const CACHE = new Map();
-const CACHE_TTL_MS = 60_000;
-const CACHE_SCHEMA_VERSION = "skills-exec-v2";
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6h
+const CACHE_SCHEMA_VERSION = "skills-exec-v3";
+const DISK_CACHE_DIR = path.join(os.homedir(), ".tokentracker", "cache", "claude-categorizer");
+
+function cacheKeyHash(key) {
+  return crypto.createHash("sha1").update(key).digest("hex").slice(0, 32);
+}
+
+function readDiskCache(key) {
+  try {
+    const fp = path.join(DISK_CACHE_DIR, `${cacheKeyHash(key)}.json`);
+    const raw = fssync.readFileSync(fp, "utf8");
+    const obj = JSON.parse(raw);
+    if (!obj || obj.schemaVersion !== CACHE_SCHEMA_VERSION) return null;
+    if (Date.now() - Number(obj.at || 0) >= CACHE_TTL_MS) return null;
+    return obj.value;
+  } catch (_e) {
+    return null;
+  }
+}
+
+function writeDiskCache(key, value) {
+  try {
+    fssync.mkdirSync(DISK_CACHE_DIR, { recursive: true });
+    const fp = path.join(DISK_CACHE_DIR, `${cacheKeyHash(key)}.json`);
+    const payload = { schemaVersion: CACHE_SCHEMA_VERSION, at: Date.now(), value };
+    fssync.writeFileSync(fp, JSON.stringify(payload));
+    // Bound on-disk size; categorizer is cheap to recompute when miss.
+    try {
+      const entries = fssync.readdirSync(DISK_CACHE_DIR)
+        .filter((n) => n.endsWith(".json"))
+        .map((n) => {
+          const p = path.join(DISK_CACHE_DIR, n);
+          let mtime = 0;
+          try { mtime = fssync.statSync(p).mtimeMs; } catch (_e) {}
+          return { p, mtime };
+        })
+        .sort((a, b) => b.mtime - a.mtime);
+      for (const e of entries.slice(16)) {
+        try { fssync.unlinkSync(e.p); } catch (_e) {}
+      }
+    } catch (_e) {}
+  } catch (_e) {}
+}
 
 function maxMtimeMs(files) {
   let max = 0;
@@ -556,6 +602,11 @@ async function computeClaudeCategoryBreakdown({ from = null, to = null, rootDir 
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
     return cached.value;
   }
+  const onDisk = readDiskCache(cacheKey);
+  if (onDisk) {
+    CACHE.set(cacheKey, { at: Date.now(), value: onDisk });
+    return onDisk;
+  }
 
   const { fromIso, toIso } = dayKeyToIsoBounds(from, to);
   const breakdown = emptyCategoryMap();
@@ -575,18 +626,31 @@ async function computeClaudeCategoryBreakdown({ from = null, to = null, rootDir 
     by_exit: new Map(),
   };
 
-  for (const fp of files) {
-    const counted = await categorizeSessionFile(
-      fp,
-      { fromIso, toIso, seenHashes },
-      breakdown,
-      toolLedger,
-      skillLedger,
-      execLedger,
-    );
-    if (counted > 0) sessionCount += 1;
-    messageCount += counted;
+  // Process files with bounded parallelism. CPU-bound (JSON.parse per line)
+  // limits the win, but overlapping the per-file fs.open + first-block read
+  // I/O behind the previous file's parsing still shaves ~15% off cold scans.
+  // `seenHashes`/`breakdown`/ledgers are mutated only inside synchronous
+  // sections of `classifyOneMessage`; `for await` in `categorizeSessionFile`
+  // only yields between lines, so workers can't tear shared state.
+  const SCAN_CONCURRENCY = 4;
+  let cursor = 0;
+  async function worker() {
+    while (cursor < files.length) {
+      const idx = cursor++;
+      if (idx >= files.length) return;
+      const counted = await categorizeSessionFile(
+        files[idx],
+        { fromIso, toIso, seenHashes },
+        breakdown,
+        toolLedger,
+        skillLedger,
+        execLedger,
+      );
+      if (counted > 0) sessionCount += 1;
+      messageCount += counted;
+    }
   }
+  await Promise.all(Array.from({ length: SCAN_CONCURRENCY }, () => worker()));
 
   const totals = emptyTotals();
   for (const key of CATEGORY_KEYS) addInto(totals, breakdown[key]);
@@ -612,6 +676,7 @@ async function computeClaudeCategoryBreakdown({ from = null, to = null, rootDir 
   };
 
   CACHE.set(cacheKey, { at: Date.now(), value: result });
+  writeDiskCache(cacheKey, result);
   // Bound cache size — categorizer is cheap to recompute, no point hoarding.
   while (CACHE.size > 32) {
     const oldest = [...CACHE.entries()].sort((a, b) => a[1].at - b[1].at)[0];

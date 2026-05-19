@@ -791,6 +791,16 @@ export function ContextBreakdownPanel({ from, to, source = "claude", referenceTo
     (subagentsSet?.categories?.length > 0) ||
     ((configuredResources?.custom_agents_count || 0) > 0);
 
+  // Attribution totals for the auxiliary rows shown to Claude (Codex keeps
+  // tool_calls/custom_agents inside the percentage bar because its parent
+  // total is already derived from the same attribution sum).
+  const toolCallsAuxTotal = source === "claude"
+    ? (toolCallsSet?.categories || []).reduce((a, c) => a + Number(c?.totals?.total_tokens || 0), 0)
+    : 0;
+  const subagentsAuxTotal = source === "claude"
+    ? (subagentsSet?.categories || []).reduce((a, c) => a + Number(c?.totals?.total_tokens || 0), 0)
+    : 0;
+
   // Sort top-level rows by total_tokens descending (matches Claude /context
   // visual rhythm: largest buckets float to the top).
   const orderedCats = [...categories].sort(
@@ -803,6 +813,7 @@ export function ContextBreakdownPanel({ from, to, source = "claude", referenceTo
       aria-label={copy("dashboard.context_breakdown.bar_aria", {
         summary: categories
           .filter((c) => c.percent > 0)
+          .filter((c) => !(source === "claude" && (c.key === "tool_calls" || c.key === "custom_agents")))
           .map((c) => `${categoryLabel(c.key)} ${c.percent}%`)
           .join("，"),
       })}
@@ -818,6 +829,14 @@ export function ContextBreakdownPanel({ from, to, source = "claude", referenceTo
           const isToolCalls = cat.key === "tool_calls";
           const isCustomAgents = cat.key === "custom_agents";
           const isReasoning = cat.key === "reasoning";
+
+          // For Claude, the bucket_tokens-derived parent and the per-call
+          // attribution-derived children are different metrics (see MCP fix
+          // in v0.17.1). Skip drawing them in the percentage bar and render
+          // both as auxiliary rows below instead so children sum to parent.
+          // Codex's tool_calls is already attribution-derived in
+          // buildCodexDisplayCategories — keep it in the bar.
+          if (source === "claude" && (isToolCalls || isCustomAgents)) return null;
 
           const hasChevron =
             (isMessages && messageRows.length > 0) ||
@@ -912,6 +931,55 @@ export function ContextBreakdownPanel({ from, to, source = "claude", referenceTo
             </Row>
           );
         })}
+
+        {/* Tool calls auxiliary row (Claude only) — same rationale as MCP
+            servers below: bucket_tokens parent and attribution-derived
+            children are different metrics. Drill-down sums match the parent
+            shown here. */}
+        {source === "claude" && toolCallsSet?.categories?.length > 0 && (
+          <Row
+            level={0}
+            colorSquare={
+              <span className="h-2 w-2 rounded-sm shrink-0 bg-oai-gray-300 dark:bg-oai-gray-600" aria-hidden="true" />
+            }
+            label={copy("dashboard.context_breakdown.category.tool_calls")}
+            tokens={formatTokens(toolCallsAuxTotal)}
+            percent={null}
+            hasChevron={true}
+            open={Boolean(openRows["tool_calls_aux"])}
+            onToggle={() => toggleRow("tool_calls_aux")}
+          >
+            <ToolCallsExpanded
+              toolSet={toolCallsSet}
+              execDetails={execDetails}
+              source={source}
+              codexQueueFallback={false}
+            />
+          </Row>
+        )}
+
+        {/* Custom agents auxiliary row (Claude only) — same rationale. */}
+        {source === "claude" && subagentsSet?.categories?.length > 0 && (
+          <Row
+            level={0}
+            colorSquare={
+              <span className="h-2 w-2 rounded-sm shrink-0 bg-oai-gray-300 dark:bg-oai-gray-600" aria-hidden="true" />
+            }
+            label={copy("dashboard.context_breakdown.category.custom_agents")}
+            tokens={formatTokens(subagentsAuxTotal)}
+            percent={null}
+            hasChevron={true}
+            open={Boolean(openRows["custom_agents_aux"])}
+            onToggle={() => toggleRow("custom_agents_aux")}
+          >
+            <ToolCallsExpanded
+              toolSet={subagentsSet}
+              execDetails={null}
+              source={source}
+              codexQueueFallback={false}
+            />
+          </Row>
+        )}
 
         {/* MCP servers row — shown separately (not in DISPLAY_GROUPS, no
             percent in bar) because tool_calls_breakdown attribution and the
