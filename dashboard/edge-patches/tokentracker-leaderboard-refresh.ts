@@ -80,6 +80,24 @@ const MODEL_PRICING: Record<string, { input: number; output: number; cache_read:
   "kimi-for-coding": { input: 0.6, output: 2, cache_read: 0.15 },
   "kimi-k2.5": { input: 0.6, output: 2, cache_read: 0.15 },
   "kimi-k2.5-free": { input: 0, output: 0, cache_read: 0 },
+  // ── Z.ai GLM (mirrored from src/lib/pricing/curated-overrides.json).
+  //    LiteLLM only keys these under provider prefixes like `zai/glm-5`,
+  //    `openrouter/z-ai/glm-4.6`, etc. The reverse-substring fallback in the
+  //    matcher requires the user-supplied model name to CONTAIN the LiteLLM
+  //    key, so the bare `glm-5.1` / `glm-4.6` strings reported by Claude
+  //    Code-compatible GLM endpoints never match. Curate them here. ──
+  "glm-5.1": { input: 1.4, output: 4.4, cache_read: 0.26 },
+  "glm-5": { input: 1.0, output: 3.2, cache_read: 0.2 },
+  "glm-5-turbo": { input: 1.2, output: 4.0, cache_read: 0.24 },
+  "glm-4.7": { input: 0.6, output: 2.2, cache_read: 0.11 },
+  "glm-4.7-flashx": { input: 0.07, output: 0.4, cache_read: 0.01 },
+  "glm-4.7-flash": { input: 0, output: 0, cache_read: 0 },
+  "glm-4.6": { input: 0.6, output: 2.2, cache_read: 0.11 },
+  "glm-4.5": { input: 0.6, output: 2.2, cache_read: 0.11 },
+  "glm-4.5-x": { input: 2.2, output: 8.9, cache_read: 0.45 },
+  "glm-4.5-air": { input: 0.2, output: 1.1, cache_read: 0.03 },
+  "glm-4.5-airx": { input: 1.1, output: 4.5, cache_read: 0.22 },
+  "glm-4.5-flash": { input: 0, output: 0, cache_read: 0 },
   // ── MiniMax / DeepSeek ──
   "MiniMax-M2.7": { input: 0.3, output: 1.2, cache_read: 0.06, cache_write: 0.375 },
   "MiniMax-M2.7-highspeed": { input: 0.6, output: 2.4, cache_read: 0.06, cache_write: 0.375 },
@@ -151,6 +169,20 @@ function getModelPricing(model: string) {
   if (lower.includes("grok-4-1-fast")) return MODEL_PRICING["grok-4-1-fast-non-reasoning"];
   if (lower.includes("grok-4")) return MODEL_PRICING["grok-4"];
   if (lower.includes("kimi")) return MODEL_PRICING["kimi-k2.5"];
+  // GLM ordering: more specific suffixes (-airx/-air/-x/-flash/-flashx/-turbo)
+  // must precede the base matchers. glm-5.1 must precede glm-5 (substring).
+  if (lower.includes("glm-4.5-airx")) return MODEL_PRICING["glm-4.5-airx"];
+  if (lower.includes("glm-4.5-air")) return MODEL_PRICING["glm-4.5-air"];
+  if (lower.includes("glm-4.5-x")) return MODEL_PRICING["glm-4.5-x"];
+  if (lower.includes("glm-4.5-flash")) return MODEL_PRICING["glm-4.5-flash"];
+  if (lower.includes("glm-4.5")) return MODEL_PRICING["glm-4.5"];
+  if (lower.includes("glm-4.7-flashx")) return MODEL_PRICING["glm-4.7-flashx"];
+  if (lower.includes("glm-4.7-flash")) return MODEL_PRICING["glm-4.7-flash"];
+  if (lower.includes("glm-4.7")) return MODEL_PRICING["glm-4.7"];
+  if (lower.includes("glm-4.6")) return MODEL_PRICING["glm-4.6"];
+  if (lower.includes("glm-5-turbo")) return MODEL_PRICING["glm-5-turbo"];
+  if (lower.includes("glm-5.1")) return MODEL_PRICING["glm-5.1"];
+  if (lower.includes("glm-5")) return MODEL_PRICING["glm-5"];
   if (lower.includes("kiro")) return MODEL_PRICING["kiro-cli-agent"];
   if (lower.includes("hy3")) return MODEL_PRICING["hy3-preview-agent"];
   if (lower.includes("composer")) return MODEL_PRICING["composer-1"];
