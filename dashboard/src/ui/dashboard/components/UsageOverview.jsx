@@ -55,6 +55,7 @@ const PROVIDER_COLORS = {
   KIMI: "#a78bfa",      // violet-400
   "KILO-CLI": "#facc15",   // yellow-400 (Kilo brand yellow)
   "KILO-CODE": "#facc15",
+  DROID: "#ef4444",        // red-500 (Factory brand)
 };
 
 function getProviderColor(label, index) {

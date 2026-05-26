@@ -175,6 +175,23 @@ function PiIcon({ size = 16, className = "" }) {
   );
 }
 
+function DroidIcon({ size = 16, className = "" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      {/* antennae */}
+      <path d="M9 3v2" />
+      <path d="M15 3v2" />
+      {/* head */}
+      <rect x="4" y="6" width="16" height="13" rx="3" />
+      {/* eyes */}
+      <circle cx="9" cy="13" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="13" r="1.4" fill="currentColor" stroke="none" />
+      {/* mouth slot */}
+      <path d="M9 16h6" />
+    </svg>
+  );
+}
+
 const PROVIDER_ICON_MAP = {
   CLAUDE: ClaudeIcon,
   CODEBUDDY: CodeBuddyIcon,
@@ -182,6 +199,7 @@ const PROVIDER_ICON_MAP = {
   COPILOT: CopilotIcon,
   CRAFT: CraftIcon,
   CURSOR: CursorIcon,
+  DROID: DroidIcon,
   GEMINI: GeminiIcon,
   GITHUB: GithubIcon,
   GROK: GrokIcon,

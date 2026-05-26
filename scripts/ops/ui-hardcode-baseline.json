@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-05-22T02:15:59.943Z",
+  "generatedAt": "2026-05-26T10:32:33.298Z",
   "root": "dashboard/src",
   "rules": {
     "colors": "hex/rgb(a) literals",
     "rawText": "JSX text nodes containing letters or digits"
   },
   "totals": {
-    "colors": 192,
-    "rawText": 116
+    "colors": 200,
+    "rawText": 134
   },
   "files": {
     "dashboard/src/components/InsforgeUserHeaderControls.jsx": {
@@ -72,9 +72,27 @@
       ]
     },
     "dashboard/src/pages/IpCheckPage.jsx": {
-      "colors": 1,
-      "rawText": 0,
-      "rawTextTokens": []
+      "colors": 8,
+      "rawText": 18,
+      "rawTextTokens": [
+        "' : valueHtml; return `",
+        "// via its user-agent stylesheet (Blink does not). Chrome looks fine, the // app does not.",
+        "25",
+        "50",
+        "75",
+        "= 0 ? \"+\" : \"\") + localOffset; const cr = state.claudeRisk; const _cc = (cr?.countryCode || \"\").toUpperCase(); const claudeTz = cr?.timezone || CC_TO_TZ[_cc] || \"\"; const tzIsExact = !!cr?.timezone; const claudeOffMin = currentOffsetMinutes(claudeTz); const localOffMin = -new Date().getTimezoneOffset(); let tzMatch = null; if (claudeTz && claudeOffMin != null) tzMatch = Math.abs(claudeOffMin - localOffMin)",
+        "= 25 ? \"text-amber-500\" : \"text-red-500\"; gaugeScoreEl.innerHTML = `",
+        "`) + row(t.devCanvasFp, `",
+        "`) + row(t.devDnt, esc(dnt)) + row(t.devWebglRender, `",
+        "`) + row(t.devWebglFp, `",
+        "`; const safeIp = esc(ip); if (isIPv6(ip)) return `",
+        "`; else langHtml = `",
+        "`; return `",
+        "element: // macOS app's WKWebView (Safari) applies a 36px padding-top to",
+        "for the header row, NOT the semantic",
+        "setTimeout(r, 1500)); let dnsServers = []; for (let attempt = 0; attempt",
+        "sidesteps all UA semantics. return ("
+      ]
     },
     "dashboard/src/pages/LeaderboardProfilePage.jsx": {
       "colors": 0,
@@ -276,7 +294,7 @@
       ]
     },
     "dashboard/src/ui/dashboard/components/UsageOverview.jsx": {
-      "colors": 10,
+      "colors": 11,
       "rawText": 2,
       "rawTextTokens": [
         "0 && (",

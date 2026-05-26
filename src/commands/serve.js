@@ -11,11 +11,16 @@ const { serveStaticFile } = require("../lib/static-server");
 const { openInBrowser } = require("../lib/browser-auth");
 
 const DEFAULT_PORT = 7680;
+const DEFAULT_MAX_PORT_ATTEMPTS = 20;
 const NPM_PACKAGE_NAME = "tokentracker-cli";
 const LOCAL_BIND_HOST = "127.0.0.1";
 
 function buildPortInUseHint(port) {
   return `Port ${port} is still in use after cleanup. Try: npx ${NPM_PACKAGE_NAME} serve --port ${port + 1}\n`;
+}
+
+function isPortUnavailableError(error) {
+  return error?.code === "EADDRINUSE" || error?.code === "EACCES" || error?.code === "EPERM";
 }
 
 function getLocalServerUrl(port) {
@@ -127,10 +132,28 @@ async function cmdServe(argv) {
     }
   });
 
-  // 4. Listen (kill stale process on same port if needed)
-  const port = opts.port;
-  await ensurePortFree(port);
-  server.listen(port, LOCAL_BIND_HOST, () => {
+  // 4. Listen. Default startup follows README behavior and picks the next
+  // available port; an explicit --port/PORT remains strict.
+  let port;
+  try {
+    port = await listenOnAvailablePort(server, opts.port, {
+      allowFallback: !opts.portExplicit,
+      ensurePortFreeFn: opts.portExplicit ? ensurePortFree : null,
+      onRetry: (failedPort) => {
+        process.stdout.write(`Port ${failedPort} unavailable, trying ${failedPort + 1}...\n`);
+      },
+    });
+  } catch (e) {
+    if (isPortUnavailableError(e)) {
+      process.stderr.write(buildPortInUseHint(opts.port));
+    } else {
+      process.stderr.write(`Server error: ${e.message}\n`);
+    }
+    process.exitCode = 1;
+    return;
+  }
+
+  {
     const url = getLocalServerUrl(port);
     process.stdout.write(
       [
@@ -148,14 +171,10 @@ async function cmdServe(argv) {
     if (opts.open) {
       openInBrowser(url);
     }
-  });
+  }
 
   server.on("error", (e) => {
-    if (e.code === "EADDRINUSE") {
-      process.stderr.write(buildPortInUseHint(port));
-    } else {
-      process.stderr.write(`Server error: ${e.message}\n`);
-    }
+    process.stderr.write(`Server error: ${e.message}\n`);
     process.exitCode = 1;
   });
 
@@ -213,6 +232,70 @@ async function ensurePortFree(port) {
   await new Promise((r) => setTimeout(r, 500));
 }
 
+function listenOnce(server, port, host) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+
+    const cleanup = () => {
+      server.off("listening", onListening);
+      server.off("error", onError);
+    };
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      fn(value);
+    };
+    const onListening = () => finish(resolve);
+    const onError = (error) => finish(reject, error);
+
+    server.once("listening", onListening);
+    server.once("error", onError);
+    try {
+      server.listen(port, host);
+    } catch (error) {
+      finish(reject, error);
+    }
+  });
+}
+
+async function listenOnAvailablePort(
+  server,
+  startPort,
+  {
+    host = LOCAL_BIND_HOST,
+    allowFallback = false,
+    maxAttempts = DEFAULT_MAX_PORT_ATTEMPTS,
+    ensurePortFreeFn = null,
+    onRetry = null,
+  } = {},
+) {
+  const attempts = allowFallback ? Math.max(1, maxAttempts) : 1;
+  let port = startPort;
+  let lastError = null;
+
+  for (let i = 0; i < attempts && port < 65536; i++, port++) {
+    if (ensurePortFreeFn) {
+      await ensurePortFreeFn(port);
+    }
+
+    try {
+      await listenOnce(server, port, host);
+      return port;
+    } catch (error) {
+      lastError = error;
+      if (!allowFallback || !isPortUnavailableError(error) || port >= 65535) {
+        throw error;
+      }
+      if (typeof onRetry === "function") {
+        onRetry(port, error);
+      }
+    }
+  }
+
+  throw lastError || new Error(`No available port found from ${startPort}`);
+}
+
 function resolveDashboardDir() {
   const candidates = [
     path.resolve(__dirname, "../../dashboard/dist"),
@@ -224,13 +307,27 @@ function resolveDashboardDir() {
   return null;
 }
 
-function parseArgs(argv) {
-  const opts = { port: DEFAULT_PORT, open: true, sync: true };
+function parsePort(value) {
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) && n > 0 && n < 65536 ? n : null;
+}
+
+function parseArgs(argv, env = process.env) {
+  const envPort = parsePort(env.PORT);
+  const opts = {
+    port: envPort || DEFAULT_PORT,
+    portExplicit: Boolean(envPort),
+    open: true,
+    sync: true,
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--port" && i + 1 < argv.length) {
-      const n = parseInt(argv[++i], 10);
-      if (Number.isFinite(n) && n > 0 && n < 65536) opts.port = n;
+      const n = parsePort(argv[++i]);
+      if (n) {
+        opts.port = n;
+        opts.portExplicit = true;
+      }
     } else if (arg === "--no-open") {
       opts.open = false;
     } else if (arg === "--no-sync") {
@@ -245,5 +342,8 @@ module.exports = {
   buildPortInUseHint,
   NPM_PACKAGE_NAME,
   LOCAL_BIND_HOST,
+  isPortUnavailableError,
+  listenOnAvailablePort,
   getLocalServerUrl,
+  parseArgs,
 };

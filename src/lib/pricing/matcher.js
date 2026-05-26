@@ -72,6 +72,33 @@ function getSortedKeys(litellm) {
   return cached;
 }
 
+function buildDotRestoredModel(model) {
+  if (typeof model !== "string") return "";
+  const lower = model.toLowerCase();
+  const restored = lower.replace(/(\d+)-(\d+)/g, "$1.$2");
+  return restored === lower ? "" : restored;
+}
+
+function lookupExactCaseInsensitive(table, model) {
+  if (!table || !model) return null;
+  if (table[model]) return table[model];
+  const lower = model.toLowerCase();
+  for (const key of Object.keys(table)) {
+    if (key.toLowerCase() === lower) return table[key];
+  }
+  return null;
+}
+
+function lookupContainedExactCaseInsensitive(table, model) {
+  if (!table || !model) return null;
+  const lower = model.toLowerCase();
+  const keys = Object.keys(table).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
+    if (lower.includes(key.toLowerCase())) return table[key];
+  }
+  return null;
+}
+
 function lookupPricing(model, { curated, litellm, source } = {}) {
   if (!model || typeof model !== "string") {
     return { hit: false, source: "empty", value: null };
@@ -80,15 +107,28 @@ function lookupPricing(model, { curated, litellm, source } = {}) {
     ? normalizeAntigravityModel(model)
     : model;
   const lower = lookupModel.toLowerCase();
+  const dotForm = buildDotRestoredModel(lookupModel);
 
   // 1. CURATED exact
   if (curated.exact && curated.exact[lookupModel]) {
     return { hit: true, source: "curated:exact", value: curated.exact[lookupModel] };
   }
+  const curatedDotExact = lookupExactCaseInsensitive(curated.exact, dotForm);
+  if (curatedDotExact) {
+    return { hit: true, source: "curated:exact-dot", value: curatedDotExact };
+  }
+  const curatedDotContainedExact = lookupContainedExactCaseInsensitive(curated.exact, dotForm);
+  if (curatedDotContainedExact) {
+    return { hit: true, source: "curated:exact-dot", value: curatedDotContainedExact };
+  }
 
   // 2. LiteLLM exact
   if (litellm && litellm[lookupModel]) {
     return { hit: true, source: "litellm:exact", value: litellm[lookupModel] };
+  }
+  const litellmDotExact = lookupExactCaseInsensitive(litellm, dotForm);
+  if (litellmDotExact) {
+    return { hit: true, source: "litellm:exact-dot", value: litellmDotExact };
   }
 
   // 3. CURATED alias (literal mapping like "auto" -> "composer-1")
@@ -100,11 +140,22 @@ function lookupPricing(model, { curated, litellm, source } = {}) {
     };
   }
 
-  // 4. CURATED fuzzy substring
+  // 4. CURATED fuzzy substring. Also try a dot-restored variant of the input
+  // (digits separated by `-` rejoined as `.`) so providers that dash-normalize
+  // numeric segments — Droid emits `glm-5-1-0` for upstream `GLM-5.1` — still
+  // resolve against dot-keyed curated entries like `glm-5.1`, `glm-4.6`, etc.
+  // The regex only fires on digit-dash-digit, so `claude-3-7-sonnet`,
+  // `gpt-5-codex`, `gemini-2-5-pro` are unaffected (no digit-pair to rejoin or
+  // no matching curated key).
   if (Array.isArray(curated.fuzzy)) {
     for (const { match, ref } of curated.fuzzy) {
       if (!match || !ref) continue;
-      if (lower.includes(match.toLowerCase()) && curated.exact[ref]) {
+      const needle = match.toLowerCase();
+      if (!curated.exact[ref]) continue;
+      if (lower.includes(needle)) {
+        return { hit: true, source: "curated:fuzzy", value: curated.exact[ref] };
+      }
+      if (dotForm && dotForm.includes(needle)) {
         return { hit: true, source: "curated:fuzzy", value: curated.exact[ref] };
       }
     }
@@ -125,7 +176,7 @@ function lookupPricing(model, { curated, litellm, source } = {}) {
       const keyLower = key.toLowerCase();
       // Only accept if model is a superset of key (model contains key), to
       // avoid e.g. "gpt-5" matching "gpt-5-pro" in the wrong direction.
-      if (lower.includes(keyLower)) {
+      if (lower.includes(keyLower) || (dotForm && dotForm.includes(keyLower))) {
         return { hit: true, source: "litellm:fuzzy", value: litellm[key] };
       }
     }

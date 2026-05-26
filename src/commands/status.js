@@ -51,6 +51,8 @@ const {
   resolveRoocodeTaskFiles,
   resolveZedDbPath,
   resolveGooseDbPath,
+  listDroidSettingsFiles,
+  resolveDroidSessionsDir,
   resolveGrokBuildSessions,
 } = require("../lib/rollout");
 const { probeGrokHookState, resolveGrokHome } = require("../lib/grok-hook");
@@ -231,6 +233,11 @@ async function cmdStatus(argv = []) {
   const gooseDbPath = resolveGooseDbPath(process.env);
   const gooseInstalled = fssync.existsSync(gooseDbPath);
 
+  // Droid (Factory CLI) — passive cumulative-delta read of *.settings.json.
+  const droidSessionsDir = resolveDroidSessionsDir(process.env);
+  const droidSettingsFiles = listDroidSettingsFiles(process.env);
+  const droidInstalled = droidSettingsFiles.length > 0;
+
   // Grok Build (xAI TUI)
   const grokHookState = await probeGrokHookState({ home, trackerDir, env: process.env });
   const grokSessions = grokHookState.hasGrokInstall || grokHookState.sessionsDir
@@ -324,6 +331,9 @@ async function cmdStatus(argv = []) {
         goose: gooseInstalled
           ? { installed: true, detail: gooseDbPath }
           : { installed: false },
+        droid: droidInstalled
+          ? { installed: true, files: droidSettingsFiles.length, detail: droidSessionsDir }
+          : { installed: false },
         grok_build: grokInstalled
           ? {
               installed: true,
@@ -407,6 +417,9 @@ async function cmdStatus(argv = []) {
         : null,
       gooseInstalled
         ? `- Goose (Block): passive reader (sessions.db, cumulative-delta)`
+        : null,
+      droidInstalled
+        ? `- Droid (Factory): passive reader (${droidSettingsFiles.length} session${droidSettingsFiles.length !== 1 ? "s" : ""} in ${droidSessionsDir}, cumulative-delta)`
         : null,
       ...(() => {
         const passive = passiveProviders.filter((p) => p.passive);

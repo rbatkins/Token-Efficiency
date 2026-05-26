@@ -118,6 +118,60 @@ test("matcher: lookupPricing handles CURATED fuzzy substring (kiro-future-xyz â†
   assert.equal(r.source, "curated:fuzzy");
 });
 
+test("matcher: lookupPricing fuzzy match restores `digit-digit` to `digit.digit` (droid GLM parity)", () => {
+  // Droid dash-normalizes upstream `GLM-5.1` to `glm-5-1`, but curated keys
+  // are dot-delimited. The matcher must retry a dot-restored variant of the
+  // input so dash-form inputs still resolve to the dot-form curated entry.
+  const curated = {
+    exact: { "glm-5.1": { input: 1.4, output: 4.4, cache_read: 0.26 } },
+    alias: {},
+    fuzzy: [{ match: "glm-5.1", ref: "glm-5.1" }],
+  };
+  const r = matcher.lookupPricing("glm-5-1-0", { curated, litellm: {} });
+  assert.equal(r.hit, true, "expected dot-form fuzzy fallback to hit");
+  assert.equal(r.source, "curated:exact-dot");
+  assert.equal(r.value.input, 1.4);
+});
+
+test("matcher: lookupPricing dot-form fallback covers exact-only Droid model ids", () => {
+  const curated = {
+    exact: { "MiniMax-M2.1": { input: 0.5, output: 3, cache_read: 0.05 } },
+    alias: {},
+    fuzzy: [],
+  };
+  const r = matcher.lookupPricing("minimax-m2-1-0", { curated, litellm: {} });
+  assert.equal(r.hit, true, "expected dot-form exact fallback to hit");
+  assert.equal(r.source, "curated:exact-dot");
+  assert.equal(r.value.output, 3);
+});
+
+test("matcher: lookupPricing dot-form fallback covers LiteLLM exact ids", () => {
+  const r = matcher.lookupPricing("vendor-model-2-1", {
+    curated: { exact: {}, alias: {}, fuzzy: [] },
+    litellm: { "vendor-model-2.1": { input: 0.2, output: 0.8 } },
+  });
+  assert.equal(r.hit, true);
+  assert.equal(r.source, "litellm:exact-dot");
+  assert.equal(r.value.input, 0.2);
+});
+
+test("matcher: lookupPricing dot-form fallback does NOT corrupt models without digit-digit pairs", () => {
+  // Regression: ensure `claude-3-7-sonnet` doesn't accidentally land on a
+  // hypothetical `claude-3.7-sonnet` fuzzy entry if one ever exists. The
+  // regex is digit-dash-digit only; the original lookup must run first.
+  const curated = {
+    exact: { "claude-3-7-sonnet": { input: 3, output: 15 } },
+    alias: {},
+    fuzzy: [],
+  };
+  const r = matcher.lookupPricing("claude-3-7-sonnet", {
+    curated,
+    litellm: {},
+  });
+  assert.equal(r.hit, true);
+  assert.equal(r.source, "curated:exact");
+});
+
 test("matcher: lookupPricing strips reasoning effort suffix to find LiteLLM base model", () => {
   const litellm = { "gpt-5-codex": { input: 1.25, output: 10 } };
   const r = matcher.lookupPricing("gpt-5-codex-high-fast", {

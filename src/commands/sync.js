@@ -52,6 +52,8 @@ const {
   parseZedIncremental,
   resolveGooseDbPath,
   parseGooseIncremental,
+  listDroidSettingsFiles,
+  parseDroidIncremental,
   bucketKey,
   totalsKey,
   claudeMessageDedupKey,
@@ -449,6 +451,35 @@ async function cmdSync(argv) {
           const pct = p.total > 0 ? p.index / p.total : 1;
           progress.update(
             `Parsing Goose ${renderBar(pct)} ${formatNumber(p.index)}/${formatNumber(
+              p.total,
+            )} sessions | buckets ${formatNumber(p.bucketsQueued)}`,
+          );
+        },
+      });
+    }
+
+    // ── Droid (Factory CLI) — passive reader for ~/.factory/sessions/*.settings.json ──
+    const droidSettingsFiles = listDroidSettingsFiles(process.env);
+    let droidResult = { recordsProcessed: 0, eventsAggregated: 0, bucketsQueued: 0 };
+    if (droidSettingsFiles.length > 0) {
+      if (progress?.enabled) {
+        progress.start(
+          `Parsing Droid ${renderBar(0)} 0/${formatNumber(droidSettingsFiles.length)} sessions | buckets 0`,
+        );
+      }
+      droidResult = await parseDroidIncremental({
+        settingsFiles: droidSettingsFiles,
+        cursors,
+        queuePath,
+        // Full-scan sync: drop cursor entries for any session whose
+        // settings.json has disappeared off disk so cursors.droid stays
+        // bounded by the actual on-disk session count.
+        prune: true,
+        onProgress: (p) => {
+          if (!progress?.enabled) return;
+          const pct = p.total > 0 ? p.index / p.total : 1;
+          progress.update(
+            `Parsing Droid ${renderBar(pct)} ${formatNumber(p.index)}/${formatNumber(
               p.total,
             )} sessions | buckets ${formatNumber(p.bucketsQueued)}`,
           );
@@ -948,7 +979,8 @@ async function cmdSync(argv) {
         kilocodeResult.recordsProcessed +
         roocodeResult.recordsProcessed +
         zedResult.recordsProcessed +
-        gooseResult.recordsProcessed;
+        gooseResult.recordsProcessed +
+        droidResult.recordsProcessed;
       const totalBuckets =
         parseResult.bucketsQueued +
         openclawResult.bucketsQueued +
@@ -971,7 +1003,8 @@ async function cmdSync(argv) {
         kilocodeResult.bucketsQueued +
         roocodeResult.bucketsQueued +
         zedResult.bucketsQueued +
-        gooseResult.bucketsQueued;
+        gooseResult.bucketsQueued +
+        droidResult.bucketsQueued;
       process.stdout.write(
         [
           "Sync finished:",
