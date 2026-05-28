@@ -150,6 +150,11 @@ export function useTrendData({
           now,
         });
       } else if (mode === "hourly") {
+        nextRows = fillHourlyGaps(nextRows, nextFrom || from || response?.day, {
+          timeZone,
+          offsetMinutes: tzOffsetMinutes,
+          now,
+        });
         nextRows = markHourlyFuture(nextRows, {
           timeZone,
           offsetMinutes: tzOffsetMinutes,
@@ -191,9 +196,15 @@ export function useTrendData({
                   offsetMinutes: tzOffsetMinutes,
                   now,
                 })
-              : Array.isArray(cached.rows)
-                ? cached.rows
-                : [];
+              : mode === "hourly"
+                ? fillHourlyGaps(cached.rows || [], cached.from || from || cached.day || to, {
+                    timeZone,
+                    offsetMinutes: tzOffsetMinutes,
+                    now,
+                  })
+                : Array.isArray(cached.rows)
+                  ? cached.rows
+                  : [];
           if (mode === "hourly") {
             filledRows = markHourlyFuture(filledRows, {
               timeZone,
@@ -291,9 +302,15 @@ export function useTrendData({
                 offsetMinutes: tzOffsetMinutes,
                 now,
               })
-            : Array.isArray(cached.rows)
-              ? cached.rows
-              : [];
+            : mode === "hourly"
+              ? fillHourlyGaps(cached.rows || [], cached.from || from || cached.day || to, {
+                  timeZone,
+                  offsetMinutes: tzOffsetMinutes,
+                  now,
+                })
+              : Array.isArray(cached.rows)
+                ? cached.rows
+                : [];
         if (mode === "hourly") {
           filledRows = markHourlyFuture(filledRows, {
             timeZone,
@@ -418,6 +435,88 @@ function fillDailyGaps(
   return filled;
 }
 
+function fillHourlyGaps(
+  rows: any[],
+  dayKey: string,
+  { timeZone, offsetMinutes, now }: any = {},
+): any[] {
+  if (!dayKey) return Array.isArray(rows) ? rows : [];
+  const normalizedDay = dayKey.trim().slice(0, 10); // YYYY-MM-DD
+  const nowParts = getNowParts({ timeZone, offsetMinutes, now });
+  const defaultDayNum = nowParts ? nowParts.dayNum : undefined;
+
+  // Detect granularity (hourly or half-hourly)
+  let hasHalfHour = false;
+  for (const row of rows || []) {
+    const label = row?.hour || row?.label || "";
+    const parsed = parseHourLabel(label, defaultDayNum);
+    if (parsed && parsed.slot % 2 !== 0) {
+      hasHalfHour = true;
+      break;
+    }
+  }
+
+  const stepMinutes = hasHalfHour ? 30 : 60;
+  const totalSlots = hasHalfHour ? 48 : 24;
+
+  const bySlot = new Map<number, any>();
+  for (const row of rows || []) {
+    const label = row?.hour || row?.label || "";
+    const parsed = parseHourLabel(label, defaultDayNum);
+    if (parsed) {
+      bySlot.set(parsed.slot, row);
+    }
+  }
+
+  const filled = [];
+  const todayKey = nowParts
+    ? `${nowParts.year}-${String(nowParts.month).padStart(2, "0")}-${String(nowParts.day).padStart(2, "0")}`
+    : "";
+
+  for (let slot = 0; slot < totalSlots; slot++) {
+    // Map current slot to existing slot
+    // If it's hourly (24 slots), the slots are 0, 2, 4... so slot mapping is slot * 2
+    const lookupSlot = hasHalfHour ? slot : slot * 2;
+    const existing = bySlot.get(lookupSlot);
+
+    const hour = Math.floor((slot * stepMinutes) / 60);
+    const minute = (slot * stepMinutes) % 60;
+    const hourStr = String(hour).padStart(2, "0");
+    const minuteStr = String(minute).padStart(2, "0");
+    const hourLabel = `${normalizedDay}T${hourStr}:${minuteStr}:00`;
+
+    let isFuture = false;
+    if (nowParts) {
+      const dayNum = nowParts.year * 10000 + nowParts.month * 100 + nowParts.day;
+      const parsedDayNum = Number(normalizedDay.replace(/-/g, ""));
+      if (parsedDayNum > dayNum) {
+        isFuture = true;
+      } else if (parsedDayNum === dayNum) {
+        const currentSlot = nowParts.hour * 2 + (nowParts.minute >= 30 ? 1 : 0);
+        isFuture = lookupSlot > currentSlot;
+      }
+    }
+
+    if (existing) {
+      filled.push({ ...existing, hour: hourLabel, missing: false, future: isFuture });
+    } else {
+      filled.push({
+        hour: hourLabel,
+        total_tokens: null,
+        billable_total_tokens: null,
+        input_tokens: null,
+        cached_input_tokens: null,
+        output_tokens: null,
+        reasoning_output_tokens: null,
+        missing: !isFuture,
+        future: isFuture,
+      });
+    }
+  }
+
+  return filled;
+}
+
 function markHourlyFuture(rows: any[], { timeZone, offsetMinutes, now }: any = {}) {
   if (!Array.isArray(rows)) return [];
   const nowParts = getNowParts({ timeZone, offsetMinutes, now });
@@ -425,14 +524,14 @@ function markHourlyFuture(rows: any[], { timeZone, offsetMinutes, now }: any = {
 
   return rows.map((row) => {
     const label = row?.hour || row?.label || "";
-    const parsed = parseHourLabel(label);
+    const parsed = parseHourLabel(label, nowParts.dayNum);
     if (!parsed) {
       return { ...row, future: false };
     }
     const isFuture =
-      parsed.dayNum > nowParts.dayNum ||
-      (parsed.dayNum === nowParts.dayNum && parsed.slot > nowParts.slot);
-    return { ...row, future: isFuture };
+      (parsed.dayNum !== null && parsed.dayNum > nowParts.dayNum) ||
+      ((parsed.dayNum === null || parsed.dayNum === nowParts.dayNum) && parsed.slot > nowParts.slot);
+    return { ...row, future: !!isFuture };
   });
 }
 
@@ -536,29 +635,49 @@ function getNowParts({ timeZone, offsetMinutes, now }: any = {}) {
   };
 }
 
-function parseHourLabel(label: any) {
+function parseHourLabel(label: any, defaultDayNum?: number) {
   if (!label) return null;
   const raw = String(label).trim();
-  const [datePart, timePart] = raw.split("T");
-  if (!datePart || !timePart) return null;
-  const dateParts = datePart.split("-");
-  if (dateParts.length !== 3) return null;
-  const year = Number(dateParts[0]);
-  const month = Number(dateParts[1]);
-  const day = Number(dateParts[2]);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-    return null;
+  if (raw.includes("T")) {
+    const [datePart, timePart] = raw.split("T");
+    if (!datePart || !timePart) return null;
+    const dateParts = datePart.split("-");
+    if (dateParts.length !== 3) return null;
+    const year = Number(dateParts[0]);
+    const month = Number(dateParts[1]);
+    const day = Number(dateParts[2]);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+      return null;
+    }
+    const timeParts = timePart.split(":");
+    const hour = Number(timeParts[0]);
+    const minute = Number(timeParts[1]);
+    if (!Number.isFinite(hour) || hour < 0 || hour > 23) return null;
+    if (!Number.isFinite(minute) || minute < 0 || minute > 59) return null;
+    const slot = hour * 2 + (minute >= 30 ? 1 : 0);
+    return {
+      dayNum: year * 10000 + month * 100 + day,
+      slot,
+    };
+  } else {
+    // Check if it's pure hour digits (e.g. "01", "1") or time digits (e.g. "01:00")
+    let hour = NaN;
+    let minute = 0;
+    if (/^\d{1,2}$/.test(raw)) {
+      hour = Number(raw);
+    } else if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(raw)) {
+      const parts = raw.split(":");
+      hour = Number(parts[0]);
+      minute = Number(parts[1]);
+    }
+    if (!Number.isFinite(hour) || hour < 0 || hour > 23) return null;
+    if (!Number.isFinite(minute) || minute < 0 || minute > 59) return null;
+    const slot = hour * 2 + (minute >= 30 ? 1 : 0);
+    return {
+      dayNum: defaultDayNum || null,
+      slot,
+    };
   }
-  const timeParts = timePart.split(":");
-  const hour = Number(timeParts[0]);
-  const minute = Number(timeParts[1]);
-  if (!Number.isFinite(hour) || hour < 0 || hour > 23) return null;
-  if (!Number.isFinite(minute) || minute < 0 || minute > 59) return null;
-  const slot = hour * 2 + (minute >= 30 ? 1 : 0);
-  return {
-    dayNum: year * 10000 + month * 100 + day,
-    slot,
-  };
 }
 
 function parseMonthLabel(label: any) {

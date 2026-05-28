@@ -367,8 +367,8 @@ export function TrendMonitor({
 
         {from && to && (
           <div className="flex justify-between text-xs text-oai-gray-500 dark:text-oai-gray-300 font-medium pt-2 border-t border-oai-gray-100 dark:border-oai-gray-800">
-            <span>{from}</span>
-            <span>{to}</span>
+            <span>{from === to ? `${from} 00:00` : from}</span>
+            <span>{from === to ? `${to} 24:00` : to}</span>
           </div>
         )}
       </div>
