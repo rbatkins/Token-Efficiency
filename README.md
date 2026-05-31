@@ -14,6 +14,7 @@ Auto-collect token counts from **22 AI coding tools**, aggregate them locally, a
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![CLI](https://img.shields.io/badge/CLI-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-lightgrey.svg)](https://www.npmjs.com/package/tokentracker-cli)
 [![macOS app](https://img.shields.io/badge/macOS%20app-menu%20bar%20%2B%20widgets-lightgrey.svg?logo=apple&logoColor=white)](https://github.com/mm7894215/TokenTracker/releases/latest)
+[![Windows app](https://img.shields.io/badge/Windows%20app-system%20tray-lightgrey.svg?logo=windows&logoColor=white)](https://github.com/mm7894215/TokenTracker/releases/latest)
 [![GitHub stars](https://img.shields.io/github/stars/mm7894215/TokenTracker?style=social)](https://github.com/mm7894215/TokenTracker/stargazers)
 [![Featured in 阮一峰周刊 #393](https://img.shields.io/badge/Featured%20in-%E9%98%AE%E4%B8%80%E5%B3%B0%E5%91%A8%E5%88%8A%20%23393-FF6B35?logo=rss&logoColor=white)](https://github.com/ruanyf/weekly/blob/master/docs/issue-393.md)
 [![Author tokens](https://srctyff5.us-east.insforge.app/functions/tokentracker-badge-svg?user_id=0652839f-d19f-4f67-af85-6b7675875443&metric=tokens&compact=1&label=author%20tokens)](https://github.com/mm7894215/TokenTracker)
@@ -38,7 +39,7 @@ Auto-collect token counts from **22 AI coding tools**, aggregate them locally, a
 
 ## ⚡ Quick Start
 
-> **Requirements**: Node.js **20+** (CLI runs on macOS / Linux / Windows; menu bar app is macOS-only. Cursor token reading uses the system `sqlite3` CLI when available and falls back to `node:sqlite` on supported Node releases).
+> **Requirements**: Node.js **20+** (CLI runs on macOS / Linux / Windows; native desktop app ships for both macOS (menu bar) and Windows (system tray). Cursor token reading uses the system `sqlite3` CLI when available and falls back to `node:sqlite` on supported Node releases).
 
 ```bash
 npx tokentracker-cli
@@ -52,7 +53,9 @@ That's it. First run installs hooks, syncs your data, and opens the dashboard at
 - 🏠 100% local — no account, no API keys, no network calls (except optional leaderboard)
 - 🧩 *Optional:* a Skills tab that browses 250+ public skills and syncs them across Claude · Codex · Grok · Antigravity · Gemini · OpenCode · Hermes
 
-> **Want a native macOS menu bar app?** [Download `TokenTrackerBar.dmg`](https://github.com/mm7894215/TokenTracker/releases/latest) → drag to Applications. Includes desktop widgets, menu bar status icon, and the same dashboard in a WKWebView.
+> **Want a native desktop app?**
+> - **macOS** — [Download `TokenTrackerBar.dmg`](https://github.com/mm7894215/TokenTracker/releases/latest/download/TokenTrackerBar.dmg) → drag to Applications. Menu bar status icon, desktop widgets, and the dashboard in a WKWebView.
+> - **Windows** — [Download `TokenTracker-Setup.exe`](https://github.com/mm7894215/TokenTracker/releases/latest/download/TokenTracker-Setup.exe) → run the per-user installer (no admin needed). System-tray app with the dashboard in WebView2. Portable zip also on the [releases page](https://github.com/mm7894215/TokenTracker/releases/latest).
 
 Install globally for shorter commands:
 
@@ -90,7 +93,7 @@ Upgrade with `brew upgrade --cask mm7894215/tokentracker/tokentracker`. The tap 
 - 🏠 **100% local** — Token data never leaves your machine. No account, no API keys.
 - 🚀 **Zero config** — Hooks auto-install on first run. From zero to dashboard in 30 seconds.
 - 📊 **Beautiful dashboard** — Usage trends, cost breakdowns by model, GitHub-style activity heatmap, project attribution
-- 🖥️ **Native macOS app** — Menu bar status icon, embedded server, WKWebView dashboard
+- 🖥️ **Native desktop app** — macOS menu bar (+ widgets) and Windows system tray, each with an embedded server and the dashboard in a native webview
 - 🎨 **4 desktop widgets** — Pin Usage / Activity Heatmap / Top Models / Usage Limits to your desktop
 - 📈 **Real-time rate limit tracking** — Claude / Codex / Cursor / Gemini / Kiro / Copilot / Antigravity quota windows with reset countdowns
 - 💰 **Cost engine** — 2,200+ models priced via [LiteLLM](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json) (auto-refreshed daily) + curated overrides for niche tools (Kiro, Cursor Composer, Kimi, CodeBuddy hy3); 24h disk cache + bundled offline snapshot mean accurate USD without an internet connection. Models without published vendor pricing (e.g. Tencent hy3-preview) are tracked by tokens but show $0 cost until the vendor publishes a rate.
@@ -197,7 +200,7 @@ Missing your tool? [Open an issue](https://github.com/mm7894215/TokenTracker/iss
 |--------------------------|:---:|:---:|:---:|
 | **AI tools supported**   | **22**           | 1 (Claude)  | 1 (Cursor)   |
 | **Local-first, no account** | ✅            | ✅           | ❌            |
-| **Native menu bar app**  | ✅                | ❌           | ❌            |
+| **Native desktop app**   | ✅ macOS + Windows | ❌           | ❌            |
 | **Desktop widgets**      | ✅ 4 widgets      | ❌           | ❌            |
 | **Rate-limit tracking**  | ✅ 7 providers    | ❌           | Cursor only  |
 | **Accurate multi-provider dedup** | ✅      | ❌ ¹         | —            |

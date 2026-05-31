@@ -37,7 +37,7 @@
 
 ## ⚡ クイックスタート
 
-> **動作要件**: Node.js **20+**（CLI は macOS / Linux / Windows で動作します。メニューバーアプリは macOS 専用です。Cursor のトークン読み取りは、利用可能であればシステムの `sqlite3` CLI を使用し、対応する Node リリースでは `node:sqlite` にフォールバックします）。
+> **動作要件**: Node.js **20+**（CLI は macOS / Linux / Windows で動作します。ネイティブデスクトップアプリは macOS（メニューバー）と Windows（システムトレイ）の両方を提供します。Cursor のトークン読み取りは、利用可能であればシステムの `sqlite3` CLI を使用し、対応する Node リリースでは `node:sqlite` にフォールバックします）。
 
 ```bash
 npx tokentracker-cli
@@ -51,7 +51,9 @@ npx tokentracker-cli
 - 🏠 100% ローカル — アカウント不要、API キー不要、ネットワーク通信なし（オプションのリーダーボードを除く）
 - 🧩 *オプション:* 250+ の公開 Skill を閲覧して Claude · Codex · Gemini · OpenCode · Hermes 間で同期できる Skills タブ
 
-> **ネイティブの macOS メニューバーアプリが欲しい?** [`TokenTrackerBar.dmg` をダウンロード](https://github.com/mm7894215/TokenTracker/releases/latest) → Applications にドラッグ。デスクトップウィジェット、メニューバーのステータスアイコン、そして WKWebView 上の同じダッシュボードを含みます。
+> **ネイティブのデスクトップアプリが欲しい?**
+> - **macOS** — [`TokenTrackerBar.dmg` をダウンロード](https://github.com/mm7894215/TokenTracker/releases/latest/download/TokenTrackerBar.dmg) → Applications にドラッグ。デスクトップウィジェット、メニューバーのステータスアイコン、WKWebView 上の同じダッシュボードを含みます。
+> - **Windows** — [`TokenTracker-Setup.exe` をダウンロード](https://github.com/mm7894215/TokenTracker/releases/latest/download/TokenTracker-Setup.exe) → 管理者権限不要のユーザー単位インストーラーを実行。WebView2 上にダッシュボードを表示するシステムトレイアプリです。ポータブル版 zip は[リリースページ](https://github.com/mm7894215/TokenTracker/releases/latest)にあります。
 
 短いコマンドで使うためグローバルインストール:
 
@@ -87,7 +89,7 @@ brew install mm7894215/tokentracker/tokentracker
 - 🏠 **100% ローカル** — トークンデータがマシンから外に出ることはありません。アカウント不要、API キー不要。
 - 🚀 **ゼロコンフィグ** — Hook は初回実行で自動インストール。0 からダッシュボードまで 30 秒。
 - 📊 **美しいダッシュボード** — 使用トレンド、モデル別コスト内訳、GitHub スタイルのアクティビティヒートマップ、プロジェクト別の帰属表示
-- 🖥️ **ネイティブ macOS アプリ** — メニューバーのステータスアイコン、組み込みサーバー、WKWebView ダッシュボード
+- 🖥️ **ネイティブデスクトップアプリ** — macOS メニューバー（ウィジェット付き）と Windows システムトレイ。それぞれ組み込みサーバーとネイティブ WebView のダッシュボードを備えます
 - 🎨 **4 種類のデスクトップウィジェット** — Pin Usage / Activity Heatmap / Top Models / Usage Limits をデスクトップに固定
 - 📈 **リアルタイムのレート制限トラッキング** — Claude / Codex / Cursor / Gemini / Kiro / Copilot / Antigravity のクォータウィンドウとリセットまでのカウントダウン
 - 💰 **コストエンジン** — [LiteLLM](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json) 経由で 2,200+ モデルの価格設定（毎日自動更新）に加え、ニッチなツール（Kiro、Cursor Composer、Kimi、CodeBuddy hy3）向けに厳選された上書き設定。24 時間のディスクキャッシュ + 同梱のオフラインスナップショットにより、ネット接続なしでも正確な USD 表示が可能です。ベンダーが公式価格を公開していないモデル（例: Tencent hy3-preview）はトークン数のみ追跡され、ベンダーが料金を公開するまでコストは $0 と表示されます。
@@ -192,7 +194,7 @@ brew install mm7894215/tokentracker/tokentracker
 |--------------------------|:---:|:---:|:---:|
 | **対応 AI ツール数**     | **22**           | 1 (Claude)  | 1 (Cursor)   |
 | **ローカルファースト、アカウント不要** | ✅            | ✅           | ❌            |
-| **ネイティブメニューバーアプリ** | ✅                | ❌           | ❌            |
+| **ネイティブデスクトップアプリ** | ✅ macOS + Windows | ❌          | ❌            |
 | **デスクトップウィジェット** | ✅ 4 種類      | ❌           | ❌            |
 | **レート制限トラッキング** | ✅ 7 プロバイダー    | ❌           | Cursor のみ  |
 

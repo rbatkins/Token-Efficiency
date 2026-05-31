@@ -62,7 +62,7 @@ landing.rank.expectation,landing,LandingPage,LandingPage,rank_expectation,"RANK_
 landing.rank.singularity,landing,LandingPage,LandingPage,rank_singularity,"APEX",,active
 landing.rank.unranked,landing,LandingPage,LandingPage,rank_unranked,"UNRANKED",,active
 landing.cta.primary,landing,LandingPage,LandingPage,cta_primary,"View Dashboard",,active
-landing.cta.secondary,landing,LandingPage,LandingPage,cta_secondary,"GITHUB SOURCE",,active
+landing.cta.secondary,landing,LandingPage,LandingPage,cta_secondary,"GitHub",,active
 
 
 
@@ -71,7 +71,12 @@ landing.cta.secondary,landing,LandingPage,LandingPage,cta_secondary,"GITHUB SOUR
 
 landing.v2.hero.title_line1,landing,LandingPage,MarketingLanding,hero_title_1,"TRACK ALL YOUR",,active
 landing.v2.hero.title_line2,landing,LandingPage,MarketingLanding,hero_title_2,"AI TOKENS",,active
-landing.v2.install.mac_cta,landing,LandingPage,MarketingLanding,mac_cta,"MAC APP (DMG)",,active
+landing.v2.install.mac_cta,landing,LandingPage,MarketingLanding,mac_cta,"Download for macOS",,active
+landing.v2.install.win_cta,landing,LandingPage,MarketingLanding,win_cta,"Download for Windows",,active
+landing.v2.install.desktop_cta,landing,LandingPage,MarketingLanding,desktop_cta,"Download desktop app",,active
+landing.v2.install.os_macos,landing,LandingPage,MarketingLanding,os_macos,"macOS",,active
+landing.v2.install.os_windows,landing,LandingPage,MarketingLanding,os_windows,"Windows",,active
+landing.v2.install.availability,landing,LandingPage,MarketingLanding,availability,"Available for macOS and Windows",,active
 landing.v2.models.title,landing,LandingPage,MarketingLanding,models_title,"SUPPORTED AI CLI TOOLS",,active
 landing.v2.compare.kicker,landing,LandingPage,MarketingLanding,compare_kicker,"SEAMLESS TRACKING",,active
 landing.v2.compare.title,landing,LandingPage,MarketingLanding,compare_title,"Stop guessing your AI usage.",,active

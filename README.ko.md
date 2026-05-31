@@ -37,7 +37,7 @@
 
 ## ⚡ 빠른 시작
 
-> **요구 사항**: Node.js **20+** (CLI는 macOS / Linux / Windows에서 동작; 메뉴바 앱은 macOS 전용. Cursor 토큰 읽기는 가능한 경우 시스템 `sqlite3` CLI를 사용하고, 지원되는 Node 릴리스에서는 `node:sqlite`로 폴백).
+> **요구 사항**: Node.js **20+** (CLI는 macOS / Linux / Windows에서 동작; 네이티브 데스크톱 앱은 macOS(메뉴바)와 Windows(시스템 트레이) 모두 제공. Cursor 토큰 읽기는 가능한 경우 시스템 `sqlite3` CLI를 사용하고, 지원되는 Node 릴리스에서는 `node:sqlite`로 폴백).
 
 ```bash
 npx tokentracker-cli
@@ -51,7 +51,9 @@ npx tokentracker-cli
 - 🏠 100% 로컬 — 계정 없음, API Key 없음, 네트워크 호출 없음 (옵션 리더보드 제외)
 - 🧩 *옵션:* 250+개의 공개 Skill을 둘러보고 Claude · Codex · Gemini · OpenCode · Hermes 간에 동기화할 수 있는 Skills 탭
 
-> **네이티브 macOS 메뉴바 앱이 필요하다면?** [`TokenTrackerBar.dmg` 다운로드](https://github.com/mm7894215/TokenTracker/releases/latest) → Applications로 드래그. 데스크톱 위젯, 메뉴바 상태 아이콘, 그리고 WKWebView 안의 동일한 대시보드를 포함합니다.
+> **네이티브 데스크톱 앱이 필요하다면?**
+> - **macOS** — [`TokenTrackerBar.dmg` 다운로드](https://github.com/mm7894215/TokenTracker/releases/latest/download/TokenTrackerBar.dmg) → Applications로 드래그. 데스크톱 위젯, 메뉴바 상태 아이콘, WKWebView 안의 동일한 대시보드를 포함합니다.
+> - **Windows** — [`TokenTracker-Setup.exe` 다운로드](https://github.com/mm7894215/TokenTracker/releases/latest/download/TokenTracker-Setup.exe) → 관리자 권한이 필요 없는 사용자 단위 설치 프로그램 실행. WebView2 안에 대시보드를 표시하는 시스템 트레이 앱입니다. 포터블 zip은 [릴리스 페이지](https://github.com/mm7894215/TokenTracker/releases/latest)에 있습니다.
 
 짧은 명령어로 쓰려면 전역 설치:
 
@@ -87,7 +89,7 @@ brew install mm7894215/tokentracker/tokentracker
 - 🏠 **100% 로컬** — 토큰 데이터가 기기를 떠나지 않습니다. 계정 없음, API Key 없음.
 - 🚀 **제로 설정** — 첫 실행 시 Hook 자동 설치. 0에서 대시보드까지 30초.
 - 📊 **아름다운 대시보드** — 사용 추세, 모델별 비용 분석, GitHub 스타일 활동 히트맵, 프로젝트 귀속 정보
-- 🖥️ **네이티브 macOS 앱** — 메뉴바 상태 아이콘, 임베디드 서버, WKWebView 대시보드
+- 🖥️ **네이티브 데스크톱 앱** — macOS 메뉴바(위젯 포함)와 Windows 시스템 트레이. 각각 임베디드 서버와 네이티브 WebView 대시보드를 제공합니다
 - 🎨 **4종 데스크톱 위젯** — Pin Usage / Activity Heatmap / Top Models / Usage Limits를 데스크톱에 고정
 - 📈 **실시간 레이트 제한 추적** — Claude / Codex / Cursor / Gemini / Kiro / Copilot / Antigravity 쿼터 윈도우와 리셋 카운트다운
 - 💰 **비용 엔진** — [LiteLLM](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json)을 통해 2,200+개 모델 가격 책정 (매일 자동 갱신) + 틈새 도구 (Kiro, Cursor Composer, Kimi, CodeBuddy hy3)를 위한 수동 큐레이션 오버라이드; 24시간 디스크 캐시 + 번들된 오프라인 스냅샷으로 인터넷 없이도 정확한 USD 표시. 벤더가 공식 가격을 공개하지 않은 모델 (예: Tencent hy3-preview)은 토큰만 추적되며 벤더가 요율을 공개할 때까지 비용은 $0으로 표시됩니다.
@@ -192,7 +194,7 @@ brew install mm7894215/tokentracker/tokentracker
 |--------------------------|:---:|:---:|:---:|
 | **지원 AI 도구**         | **22**           | 1 (Claude)  | 1 (Cursor)   |
 | **로컬 우선, 계정 불필요** | ✅            | ✅           | ❌            |
-| **네이티브 메뉴바 앱**   | ✅                | ❌           | ❌            |
+| **네이티브 데스크톱 앱** | ✅ macOS + Windows | ❌          | ❌            |
 | **데스크톱 위젯**        | ✅ 4종            | ❌           | ❌            |
 | **레이트 제한 추적**     | ✅ 7개 프로바이더 | ❌           | Cursor 전용  |
 

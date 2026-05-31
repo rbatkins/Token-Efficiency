@@ -81,14 +81,19 @@ test("workflow creates DMG via create-dmg.sh", () => {
   assert.ok(content.includes("create-dmg.sh"));
 });
 
-test("workflow creates GitHub release with DMG asset", () => {
+test("workflow creates the release up front and uploads the DMG asset", () => {
   const content = loadWorkflow();
+  // A dedicated create-release job makes the release first (so macOS + Windows
+  // can attach in parallel); the build job then uploads the DMG with --clobber.
   assert.ok(content.includes("gh release create"));
+  assert.ok(content.includes("gh release upload"));
   assert.ok(content.includes("TokenTrackerBar.dmg"));
 });
 
-test("workflow has correct step order: dashboard → bundle → xcode → dmg → release", () => {
+test("workflow has correct step order: dashboard → bundle → xcode → dmg → upload", () => {
   const content = loadWorkflow();
+  // `gh release create` now lives in the create-release job (before these
+  // steps), so the ordered milestone is the DMG upload, which must come last.
   const steps = [
     "dashboard:build",
     "bundle-node.sh",
@@ -96,7 +101,7 @@ test("workflow has correct step order: dashboard → bundle → xcode → dmg �
     "patch-pbxproj-icon.rb",
     "xcodebuild",
     "create-dmg.sh",
-    "gh release create",
+    "gh release upload",
   ];
   let lastIndex = -1;
   for (const step of steps) {

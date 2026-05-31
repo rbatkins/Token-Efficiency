@@ -113,6 +113,16 @@ test("workflow attaches BOTH the zip and the installer to a GitHub release", () 
   assert.ok(content.includes("TokenTracker-Setup-v"), "installer asset");
 });
 
+test("workflow uploads a stable version-less installer alias for landing deep links", () => {
+  const content = loadWorkflow();
+  // The landing page links releases/latest/download/TokenTracker-Setup.exe,
+  // which only resolves if a version-less asset of that exact name is uploaded.
+  assert.ok(
+    /TokenTracker-Setup\.exe/.test(content),
+    "must upload a version-less TokenTracker-Setup.exe alias"
+  );
+});
+
 test("workflow has correct step order: dashboard → bundle → publish → copy → zip → installer → release", () => {
   const content = loadWorkflow();
   const steps = [

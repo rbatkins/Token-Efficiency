@@ -37,7 +37,7 @@
 
 ## ⚡ 快速开始
 
-> **环境要求**：Node.js **20+**（CLI 支持 macOS / Linux / Windows；菜单栏 App 与 Cursor 的 SQLite 读取仅限 macOS）。
+> **环境要求**：Node.js **20+**（CLI 支持 macOS / Linux / Windows；原生桌面 App 提供 macOS 菜单栏版与 Windows 系统托盘版；Cursor 的 SQLite 读取仅限 macOS）。
 
 ```bash
 npx tokentracker-cli
@@ -51,7 +51,9 @@ npx tokentracker-cli
 - 🏠 100% 本地运行 —— 无账号、无 API Key、无网络请求（排行榜是可选的）
 - 🧩 *可选：* Skills 面板——浏览 250+ 公开 skill，并在 Claude · Codex · Grok · Antigravity · Gemini · OpenCode · Hermes 之间同步
 
-> **想要原生 macOS 菜单栏 App？** [下载 `TokenTrackerBar.dmg`](https://github.com/mm7894215/TokenTracker/releases/latest) → 拖入「应用程序」即可。包含桌面小组件、菜单栏状态图标，以及同一套 Dashboard（跑在 WKWebView 里）。
+> **想要原生桌面 App？**
+> - **macOS** —— [下载 `TokenTrackerBar.dmg`](https://github.com/mm7894215/TokenTracker/releases/latest/download/TokenTrackerBar.dmg) → 拖入「应用程序」即可。包含桌面小组件、菜单栏状态图标，以及同一套 Dashboard（跑在 WKWebView 里）。
+> - **Windows** —— [下载 `TokenTracker-Setup.exe`](https://github.com/mm7894215/TokenTracker/releases/latest/download/TokenTracker-Setup.exe) → 运行免管理员的单用户安装包即可。系统托盘 App，Dashboard 跑在 WebView2 里。便携版 zip 见[发布页](https://github.com/mm7894215/TokenTracker/releases/latest)。
 
 全局安装可以少敲字：
 
@@ -89,7 +91,7 @@ brew install mm7894215/tokentracker/tokentracker
 - 🏠 **100% 本地** —— Token 数据绝不离开你的机器。无账号、无 API Key
 - 🚀 **零配置** —— 首次运行自动安装所有 hook。30 秒从零到 Dashboard
 - 📊 **漂亮的 Dashboard** —— 用量趋势、按模型的成本分解、GitHub 风格活跃度热力图、按项目归因
-- 🖥️ **原生 macOS App** —— 菜单栏状态图标 + 内嵌服务 + WKWebView Dashboard
+- 🖥️ **原生桌面 App** —— macOS 菜单栏（含桌面小组件）与 Windows 系统托盘，各自内嵌服务 + 原生 WebView Dashboard
 - 🎨 **4 种桌面小组件** —— 用量 / 热力图 / 热门模型 / 使用限额 直接钉桌面
 - 📈 **实时限额追踪** —— Claude / Codex / Cursor / Gemini / Kiro / Copilot / Antigravity 的配额窗口与重置倒计时
 - 💰 **成本引擎** —— 内置 70+ 模型定价表，精确到 USD
@@ -194,7 +196,7 @@ brew install mm7894215/tokentracker/tokentracker
 |--------------------------|:---:|:---:|:---:|
 | **支持的 AI 工具数**     | **22**           | 1（Claude）  | 1（Cursor）   |
 | **本地优先，无需账号**   | ✅               | ✅           | ❌            |
-| **原生菜单栏 App**       | ✅               | ❌           | ❌            |
+| **原生桌面 App**         | ✅ macOS + Windows | ❌          | ❌            |
 | **桌面小组件**           | ✅ 4 个小组件    | ❌           | ❌            |
 | **限额追踪**             | ✅ 7 家 provider | ❌           | 只支持 Cursor |
 

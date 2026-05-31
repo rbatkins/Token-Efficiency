@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "motion/react";
 import { cn } from "../../lib/cn";
@@ -15,6 +15,7 @@ import { SpotlightCard } from "./components/SpotlightCard.jsx";
 import { TiltedCard } from "./components/TiltedCard.jsx";
 import { BorderGlow } from "./components/BorderGlow.jsx";
 import { AGENT_LOGOS } from "./agent-logos.js";
+import { detectOS } from "../../lib/os";
 
 function AppleIcon({ className }) {
   return (
@@ -28,6 +29,24 @@ function GithubIcon({ className }) {
   return (
     <svg viewBox="0 0 16 16" className={className} fill="currentColor">
       <path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z" />
+    </svg>
+  );
+}
+
+function WindowsIcon({ className }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M3 5.46 10.2 4.5v6.92H3V5.46Zm0 13.08 7.2.96v-6.84H3v5.88Zm8.04 1.08L21 21V12.46h-9.96v7.16ZM11.04 4.38 21 3v8.46h-9.96V4.38Z" />
+    </svg>
+  );
+}
+
+function DownloadIcon({ className }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+      <polyline points="7 10 12 15 17 10"></polyline>
+      <line x1="12" y1="15" x2="12" y2="3"></line>
     </svg>
   );
 }
@@ -50,7 +69,14 @@ function CheckIcon({ className }) {
 }
 
 const REPO_URL = "https://github.com/mm7894215/TokenTracker";
-const MAC_RELEASE_URL = "https://github.com/mm7894215/TokenTracker/releases/latest";
+// The releases page lists every asset (used for the "other platforms" link and
+// as the fallback when we can't detect the OS).
+const RELEASES_URL = "https://github.com/mm7894215/TokenTracker/releases/latest";
+// Stable, version-less asset names so these deep links survive version bumps.
+// macOS: TokenTrackerBar.dmg (already stable). Windows: TokenTracker-Setup.exe
+// (the per-user installer; release-windows.yml uploads this alias every release).
+const MAC_DMG_URL = `${RELEASES_URL}/download/TokenTrackerBar.dmg`;
+const WIN_SETUP_URL = `${RELEASES_URL}/download/TokenTracker-Setup.exe`;
 
 function buttonClass(variant = "default", size = "md", className) {
   const base =
@@ -91,6 +117,23 @@ export function MarketingLanding({
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
   const { signedIn, loading: authLoading } = useInsforgeAuth();
   const { openLoginModal } = useLoginModal();
+
+  // Auto-detect the visitor's OS so the primary native-app download names their
+  // platform ("Download for macOS" / "Download for Windows") and deep-links the
+  // right installer. Unknown OS → the releases page. Detected once on mount.
+  const os = useMemo(() => detectOS(), []);
+  const macDownload = { href: MAC_DMG_URL, label: copy("landing.v2.install.os_macos"), Icon: AppleIcon };
+  const winDownload = { href: WIN_SETUP_URL, label: copy("landing.v2.install.os_windows"), Icon: WindowsIcon };
+  const nativeDownload =
+    os === "windows"
+      ? { href: WIN_SETUP_URL, label: copy("landing.v2.install.win_cta"), Icon: WindowsIcon }
+      : os === "mac"
+        ? { href: MAC_DMG_URL, label: copy("landing.v2.install.mac_cta"), Icon: AppleIcon }
+        : { href: RELEASES_URL, label: copy("landing.v2.install.desktop_cta"), Icon: DownloadIcon };
+  // Secondary links name the OTHER platform(s) directly (no generic "other
+  // platforms"): on macOS → Windows, on Windows → macOS, unknown → both.
+  const secondaryDownloads =
+    os === "windows" ? [macDownload] : os === "mac" ? [winDownload] : [macDownload, winDownload];
 
   // Canonical supported-agent list shared with the dashboard auth gate; names
   // are metadata (React keys + a11y), not rendered text, so no copy entry needed.
@@ -202,7 +245,7 @@ export function MarketingLanding({
                   </span>
                 </h1>
                 <p className="mt-5 sm:mt-6 text-base sm:text-lg leading-relaxed text-oai-gray-400">
-                  {copy("landing.v2.hero.subtagline")}
+                  {copy("landing.v2.hero.subtagline")} {copy("landing.v2.install.availability")}
                 </p>
 
                 <div className="mt-8 w-full max-w-lg mx-auto">
@@ -263,17 +306,33 @@ export function MarketingLanding({
                     </div>
                   </motion.div>
                   
-                  <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-4">
-                    <a href={MAC_RELEASE_URL} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 text-sm font-medium text-oai-gray-400 hover:text-white transition-colors">
-                      <div className="flex items-center justify-center h-8 w-8 rounded-full bg-oai-gray-800 group-hover:bg-oai-gray-700 transition-colors">
-                        <AppleIcon className="h-4 w-4 text-oai-gray-400 group-hover:text-white" />
-                      </div>
-                      {copy("landing.v2.install.mac_cta")}
+                  {/* Primary native-app download — auto-detects the visitor's OS
+                      and deep-links the right installer. A compact centered pill
+                      (not full-width) so it balances with the npx command above
+                      instead of dominating it. Availability is stated up in the
+                      hero subtitle, so no caption here. */}
+                  <div className="mt-5 flex justify-center">
+                    <a
+                      href={nativeDownload.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group inline-flex h-11 items-center justify-center gap-2 rounded-full bg-white px-7 text-sm font-semibold text-oai-gray-950 shadow-lg shadow-black/30 transition-all duration-200 hover:bg-oai-gray-100 active:scale-[0.98]"
+                    >
+                      <nativeDownload.Icon className="h-4 w-4" />
+                      {nativeDownload.label}
                     </a>
+                  </div>
+
+                  {/* Secondary: the other platform(s) by name, plus the source repo. */}
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+                    {secondaryDownloads.map((d) => (
+                      <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 text-sm font-medium text-oai-gray-400 hover:text-white transition-colors">
+                        <d.Icon className="h-4 w-4 text-oai-gray-500 group-hover:text-white" />
+                        {d.label}
+                      </a>
+                    ))}
                     <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 text-sm font-medium text-oai-gray-400 hover:text-white transition-colors">
-                      <div className="flex items-center justify-center h-8 w-8 rounded-full bg-oai-gray-800 group-hover:bg-oai-gray-700 transition-colors">
-                        <GithubIcon className="h-4 w-4 text-oai-gray-400 group-hover:text-white" />
-                      </div>
+                      <GithubIcon className="h-4 w-4 text-oai-gray-500 group-hover:text-white" />
                       {copy("landing.cta.secondary")}
                     </a>
                   </div>
