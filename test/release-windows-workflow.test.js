@@ -239,12 +239,18 @@ test("release-dmg invokes release-windows so one dispatch ships both platforms",
   );
 });
 
-test("Windows release job waits for the macOS job (no create-vs-create race)", () => {
+test("macOS + Windows build in parallel off a shared create-release job", () => {
   const dmg = fs.readFileSync(DMG_WORKFLOW_PATH, "utf8");
-  // The Windows job must `needs: build` so the macOS job creates the vX.Y.Z
-  // release first; Windows then uploads with --clobber.
+  // A dedicated create-release job makes the release first; both the macOS
+  // `build` job and the `windows` job depend on it (NOT on each other), so they
+  // run in parallel and each uploads its assets with --clobber.
+  assert.ok(/^\s{2}create-release:/m.test(dmg), "must have a create-release job");
   assert.ok(
-    /windows:\s*\n\s*needs:\s*build/.test(dmg),
-    "windows job must declare `needs: build`"
+    /windows:\s*\n\s*needs:\s*create-release/.test(dmg),
+    "windows job must declare `needs: create-release` (parallel, not serial)"
+  );
+  assert.ok(
+    /build:\s*\n\s*needs:\s*create-release/.test(dmg),
+    "macOS build job must also depend on create-release"
   );
 });
