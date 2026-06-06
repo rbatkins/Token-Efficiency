@@ -13,6 +13,30 @@
  *      considered. tokentracker_devices_active_unique enforces one active
  *      device per (user, platform, device_name), so this filter drops the
  *      historic device_id churn from before partial-unique was enforced.
+ *
+ * Cross-device semantic = SUM (intentional; see GitHub Discussion #101).
+ *   The account view aggregates a user's usage ACROSS devices, so two real
+ *   machines MUST add up. SUM is correct ONLY when one physical machine maps
+ *   to ONE device_id. That invariant is provided by the MACHINE-stable device
+ *   identity: the dashboard derives device_name from a per-machine id served by
+ *   the local CLI (`/functions/tokentracker-machine-id`, see
+ *   dashboard/src/lib/cloud-sync.ts → resolveDeviceNameSuffix) instead of a
+ *   per-browser localStorage id. Without that, one machine opened in multiple
+ *   browsers split a bucket's cumulative emissions across device_ids and SUM
+ *   inflated the total.
+ *
+ *   PRODUCTION CHECK (30d, real data): SUM exceeds the leaderboard's
+ *   cross-device MAX by ~3.8% of the active-device total — but 99.3% of that
+ *   gap is GENUINE multi-machine usage (e.g. one user on MacIntel + Win32, or a
+ *   Linux server + a Mac laptop) that SUM correctly adds and MAX would wrongly
+ *   drop. That is exactly why this view uses SUM. True same-machine duplication
+ *   is only ~0.03% of the active total (1 user, same-platform device churn).
+ *   F1 (machine-stable device_name, see cloud-sync.ts) prevents NEW same-machine
+ *   spray; the tiny legacy churn ages out of rolling windows. Optional
+ *   fast-follow: a NON-destructive device-consolidation cleanup (back up first;
+ *   NEVER an offset-reset migration — that caused the 2.17B-token loss in
+ *   CLAUDE.md). The dashboard total intentionally differs from the leaderboard
+ *   rank because the leaderboard's MAX under-counts true multi-machine users.
  */
 import { createClient } from "npm:@insforge/sdk";
 
@@ -319,12 +343,20 @@ interface HourlyRow {
 
 function computeRowCost(row: HourlyRow): number {
   const p = getModelPricing(row.model);
+  // Codex / every-code fold reasoning into output_tokens (OpenAI convention),
+  // so charging reasoning_output_tokens again at the output rate double-counts.
+  // Must stay in lockstep with src/lib/pricing/index.js:computeRowCost and
+  // tokentracker-leaderboard-refresh.ts (both guard on source).
+  const reasoningCost =
+    row.source === "codex" || row.source === "every-code"
+      ? 0
+      : (Number(row.reasoning_output_tokens) || 0) * (p.output || 0);
   return (
     ((Number(row.input_tokens) || 0) * (p.input || 0) +
       (Number(row.output_tokens) || 0) * (p.output || 0) +
       (Number(row.cached_input_tokens) || 0) * (p.cache_read || 0) +
       (Number(row.cache_creation_input_tokens) || 0) * ((p.cache_write ?? 0)) +
-      (Number(row.reasoning_output_tokens) || 0) * (p.output || 0)) /
+      reasoningCost) /
     1_000_000
   );
 }

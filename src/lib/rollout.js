@@ -679,21 +679,23 @@ async function parseOpenclawSessionFile({
 
     const model = normalizeModelInput(msg.model) || DEFAULT_MODEL;
 
-    // Per CLAUDE.md: cached_input_tokens = cache reads,
-    // cache_creation_input_tokens = cache writes. Also re-derive total_tokens
-    // as input + output + cache_creation + cache_read so cost math works
-    // even when the source's own totalTokens is stale or rounded.
-    const inputTok = Number(usage.input || 0);
-    const cacheReadTok = Number(usage.cacheRead || 0);
-    const cacheWriteTok = Number(usage.cacheWrite || 0);
-    const outputTok = Number(usage.output || 0);
+    // OpenClaw wraps Codex, so it follows the same OpenAI convention where
+    // `input` INCLUDES cached reads. Normalize by subtracting cached from
+    // input so `input_tokens` is pure non-cached (matches CLAUDE.md spec
+    // and prevents downstream double-counting at the cache_read rate on top
+    // of the full input rate — ~6–7x cost inflation on cache-heavy sessions).
+    const openclawRawInput = Number(usage.input || 0);
+    const openclawCached = Number(usage.cacheRead || 0);
+    const openclawCacheWrite = Number(usage.cacheWrite || 0);
+    const openclawOutput = Number(usage.output || 0);
+    const openclawInput = Math.max(0, openclawRawInput - openclawCached);
     const delta = {
-      input_tokens: inputTok,
-      cached_input_tokens: cacheReadTok,
-      cache_creation_input_tokens: cacheWriteTok,
-      output_tokens: outputTok,
+      input_tokens: openclawInput,
+      cached_input_tokens: openclawCached,
+      cache_creation_input_tokens: openclawCacheWrite,
+      output_tokens: openclawOutput,
       reasoning_output_tokens: 0,
-      total_tokens: inputTok + outputTok + cacheReadTok + cacheWriteTok,
+      total_tokens: openclawInput + openclawCached + openclawCacheWrite + openclawOutput,
       conversation_count: 1,
     };
 

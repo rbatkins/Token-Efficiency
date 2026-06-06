@@ -305,12 +305,20 @@ interface HourlyRow {
 
 function computeRowCost(row: HourlyRow): number {
   const p = getModelPricing(row.model);
+  // Codex / every-code fold reasoning into output_tokens (OpenAI convention),
+  // so charging reasoning_output_tokens again at the output rate double-counts.
+  // Must stay in lockstep with src/lib/pricing/index.js:computeRowCost and
+  // tokentracker-leaderboard-refresh.ts (both guard on source).
+  const reasoningCost =
+    row.source === "codex" || row.source === "every-code"
+      ? 0
+      : (Number(row.reasoning_output_tokens) || 0) * (p.output || 0);
   return (
     ((Number(row.input_tokens) || 0) * (p.input || 0) +
       (Number(row.output_tokens) || 0) * (p.output || 0) +
       (Number(row.cached_input_tokens) || 0) * (p.cache_read || 0) +
       (Number(row.cache_creation_input_tokens) || 0) * ((p.cache_write ?? 0)) +
-      (Number(row.reasoning_output_tokens) || 0) * (p.output || 0)) /
+      reasoningCost) /
     1_000_000
   );
 }
