@@ -125,6 +125,17 @@ test("mintAccessToken surfaces a rotated refresh token", async () => {
   assert.equal(out.refreshToken, "new");
 });
 
+test("mintAccessToken surfaces the csrf token paired with a rotation", async () => {
+  __resetCloudAccountCacheForTests();
+  const access = makeJwt({ expSeconds: Math.floor(Date.now() / 1000) + 3600 });
+  const out = await mintAccessToken({
+    refreshToken: "old",
+    fetchImpl: async () =>
+      jsonResponse({ accessToken: access, refreshToken: "new", csrfToken: "csrf-new" }),
+  });
+  assert.equal(out.csrfToken, "csrf-new");
+});
+
 test("fetchAccountFunction forwards query params except account/scope, sets auth headers", async () => {
   const captured = {};
   const fetchImpl = async (urlStr, opts) => {
@@ -205,4 +216,25 @@ test("fetchAccountUsage mints a token then returns the account payload", async (
   });
   assert.deepEqual(out.data, payload);
   assert.equal(out.rotatedRefreshToken, null);
+  assert.equal(out.rotatedCsrfToken, null);
+});
+
+test("fetchAccountUsage threads the rotated csrf token through to the caller", async () => {
+  __resetCloudAccountCacheForTests();
+  const access = makeJwt({ expSeconds: Math.floor(Date.now() / 1000) + 3600 });
+  const fetchImpl = async (urlStr) => {
+    if (urlStr.includes("/api/auth/refresh")) {
+      return jsonResponse({ accessToken: access, refreshToken: "rotated", csrfToken: "csrf-rotated" });
+    }
+    return jsonResponse({ totals: {} });
+  };
+  const out = await fetchAccountUsage({
+    usageSlug: "tokentracker-usage-summary",
+    searchParams: new URLSearchParams(),
+    baseUrl: "https://cloud.example",
+    refreshToken: "r",
+    fetchImpl,
+  });
+  assert.equal(out.rotatedRefreshToken, "rotated");
+  assert.equal(out.rotatedCsrfToken, "csrf-rotated");
 });

@@ -76,9 +76,18 @@ function __resetCloudAccountCacheForTests() {
   tokenCache = { refreshToken: null, accessToken: null, expMs: 0 };
 }
 
+function csrfTokenFromRefreshPayload(data) {
+  if (!data || typeof data !== "object") return null;
+  const raw =
+    (typeof data.csrfToken === "string" && data.csrfToken) ||
+    (typeof data.csrf_token === "string" && data.csrf_token) ||
+    null;
+  return raw && raw.length > 0 ? raw : null;
+}
+
 /**
  * Mint (or reuse a cached) InsForge access token from a refresh token.
- * @returns {Promise<{accessToken: string, refreshToken: string|null}|null>}
+ * @returns {Promise<{accessToken: string, refreshToken: string|null, csrfToken: string|null}|null>}
  *   null when no refresh token is available or the refresh failed.
  */
 async function mintAccessToken({
@@ -95,7 +104,7 @@ async function mintAccessToken({
     tokenCache.accessToken &&
     tokenCache.expMs - skewMs > now()
   ) {
-    return { accessToken: tokenCache.accessToken, refreshToken: null };
+    return { accessToken: tokenCache.accessToken, refreshToken: null, csrfToken: null };
   }
 
   const root = String(baseUrl || DEFAULT_BASE_URL).replace(/\/$/, "");
@@ -131,6 +140,11 @@ async function mintAccessToken({
   return {
     accessToken,
     refreshToken: rotated && rotated !== refreshToken ? rotated : null,
+    // Rotating the refresh token can invalidate the csrf token paired with the
+    // previous session state. Surface the fresh one so the caller can keep the
+    // relayed (refresh, csrf) pair in sync — a stale relayed csrf breaks the
+    // dashboard's cookie-path refresh with 403 Invalid CSRF.
+    csrfToken: csrfTokenFromRefreshPayload(data),
   };
 }
 
@@ -170,7 +184,7 @@ async function fetchAccountFunction({
  * High-level helper used by local-api: mint a token from `refreshToken`, then
  * fetch the cross-device aggregate matching `usageSlug`.
  *
- * @returns {Promise<{data: any, rotatedRefreshToken: string|null}|null>}
+ * @returns {Promise<{data: any, rotatedRefreshToken: string|null, rotatedCsrfToken: string|null}|null>}
  *   null when there is no cloud equivalent, no refresh token, or the refresh
  *   failed. Throws only when the account endpoint itself errors (so callers can
  *   distinguish "not signed in" from "cloud request failed").
@@ -198,7 +212,7 @@ async function fetchAccountUsage({
     searchParams,
     fetchImpl,
   });
-  return { data, rotatedRefreshToken: minted.refreshToken };
+  return { data, rotatedRefreshToken: minted.refreshToken, rotatedCsrfToken: minted.csrfToken };
 }
 
 module.exports = {

@@ -981,6 +981,14 @@ function createLocalApiHandler({ queuePath }) {
       persistRelayCookies();
     }
   }
+  function setRelayCsrfToken(token) {
+    if (!token || typeof token !== "string") return;
+    const cookie = `${csrfRelayCookieName}=${encodeURIComponent(token)}; Path=/; SameSite=Lax`;
+    if (relayCookies.get(csrfRelayCookieName) !== cookie) {
+      relayCookies.set(csrfRelayCookieName, cookie);
+      persistRelayCookies();
+    }
+  }
 
   // Returns "served" when the cross-device aggregate was written to `res`, or
   // "fallthrough" when the caller should serve the local single-machine data.
@@ -1001,6 +1009,7 @@ function createLocalApiHandler({ queuePath }) {
       });
       if (!out || out.data == null) return "fallthrough";
       if (out.rotatedRefreshToken) setRelayRefreshToken(out.rotatedRefreshToken);
+      if (out.rotatedCsrfToken) setRelayCsrfToken(out.rotatedCsrfToken);
       res.writeHead(200, {
         "Content-Type": "application/json",
         "Cache-Control": "no-store",
@@ -1114,7 +1123,16 @@ function createLocalApiHandler({ queuePath }) {
         const hasClientCookie = normalizeCookieHeader(proxyHeaders["cookie"]).trim().length > 0;
         const hasCsrfHeader = typeof proxyHeaders["x-csrf-token"] === "string" && proxyHeaders["x-csrf-token"].trim().length > 0;
         const relayCsrfToken = getRelayCookieValue(csrfRelayCookieName);
-        if (p === "/api/auth/refresh" && relayCsrfToken) {
+        const relayRefreshToken = getRelayCookieValue("insforge_refresh_token", { decode: true });
+        // A cookie-less client (fresh WebView after an app update/restart) has no
+        // browser session to pair a CSRF token with — the persisted refresh token
+        // replayed through the mobile flow is the only viable recovery. The relay
+        // csrf token must NOT force the cookie/csrf path here: background mobile
+        // rotations (cloud-account.js) can leave it stale, and a stale csrf turns
+        // recovery into 403 Invalid CSRF and signs the user out.
+        const shouldUseRelayRefreshFallback =
+          p === "/api/auth/refresh" && !hasClientCookie && relayRefreshToken;
+        if (p === "/api/auth/refresh" && relayCsrfToken && !shouldUseRelayRefreshFallback) {
           proxyHeaders["x-csrf-token"] = relayCsrfToken;
         }
         const hasEffectiveCsrfHeader =
@@ -1122,9 +1140,6 @@ function createLocalApiHandler({ queuePath }) {
           (typeof proxyHeaders["x-csrf-token"] === "string" && proxyHeaders["x-csrf-token"].trim().length > 0);
         let shouldInjectRelayCookies =
           p !== "/api/auth/refresh" || hasClientCookie || hasEffectiveCsrfHeader;
-        const relayRefreshToken = getRelayCookieValue("insforge_refresh_token", { decode: true });
-        const shouldUseRelayRefreshFallback =
-          p === "/api/auth/refresh" && !hasClientCookie && !hasEffectiveCsrfHeader && relayRefreshToken;
         if (shouldUseRelayRefreshFallback) {
           shouldInjectRelayCookies = false;
         }
@@ -1155,25 +1170,60 @@ function createLocalApiHandler({ queuePath }) {
           delete proxyHeaders["content-length"];
           proxyBody = Buffer.from(JSON.stringify({ refresh_token: relayRefreshToken }), "utf8");
         }
-        const proxyRes = await fetch(effectiveTargetUrl, {
+        let proxyRes = await fetch(effectiveTargetUrl, {
           method: req.method || "GET",
           headers: proxyHeaders,
           body: proxyBody,
           credentials: "include",
           redirect: "manual",
         });
+        let resBody = Buffer.from(await proxyRes.arrayBuffer());
+
+        // Stale-CSRF rescue: 403 Invalid CSRF on refresh does NOT mean the
+        // session is dead — background mobile rotations (cloud-account.js) can
+        // desync the relayed csrf from a still-valid refresh token. Replay the
+        // persisted refresh token through the csrf-free mobile flow before
+        // letting the client sign out.
+        const isStaleCsrf403 =
+          p === "/api/auth/refresh"
+          && proxyRes.status === 403
+          && /invalid csrf token/i.test(resBody.toString("utf8"));
+        if (isStaleCsrf403 && relayRefreshToken && !shouldUseRelayRefreshFallback) {
+          const rescueHeaders = { ...proxyHeaders, "content-type": "application/json" };
+          delete rescueHeaders["cookie"];
+          delete rescueHeaders["x-csrf-token"];
+          delete rescueHeaders["content-length"];
+          const rescueRes = await fetch(
+            `${insforgeBase.replace(/\/$/, "")}/api/auth/refresh?client_type=mobile`,
+            {
+              method: "POST",
+              headers: rescueHeaders,
+              body: JSON.stringify({ refresh_token: relayRefreshToken }),
+              credentials: "include",
+              redirect: "manual",
+            },
+          );
+          if (rescueRes.ok) {
+            proxyRes = rescueRes;
+            resBody = Buffer.from(await rescueRes.arrayBuffer());
+          }
+        }
+
+        // Error responses must not mutate relay state: a 403's deletion
+        // set-cookie (insforge_refresh_token=; Expires=1970) would otherwise
+        // destroy a still-valid persisted session.
+        const allowRelayCapture = proxyRes.status < 400;
         const responseHeaders = [...proxyRes.headers.entries()]
           .filter(([k]) => !["transfer-encoding", "connection"].includes(k.toLowerCase()))
           .map(([k, v]) => {
             if (k.toLowerCase() === "set-cookie") {
               const rewritten = v.replace(/;\s*[Dd]omain=[^;]*/g, "; Domain=localhost");
-              captureSetCookies(rewritten);
+              if (allowRelayCapture) captureSetCookies(rewritten);
               return [k, rewritten];
             }
             return [k, v];
           });
         res.writeHead(proxyRes.status, Object.fromEntries(responseHeaders));
-        const resBody = Buffer.from(await proxyRes.arrayBuffer());
         if (proxyRes.status >= 200 && proxyRes.status < 300) {
           if (p === "/api/auth/logout") {
             clearRelayCookies("sign out");
@@ -1182,11 +1232,10 @@ function createLocalApiHandler({ queuePath }) {
           }
         }
         if (
-          p === "/api/auth/refresh"
+          isStaleCsrf403
           && proxyRes.status === 403
           && injectedRelayCookies
           && !hasClientCookie
-          && /invalid csrf token/i.test(resBody.toString("utf8"))
         ) {
           clearRelayCookies("stale refresh cookie without local CSRF context");
         }
