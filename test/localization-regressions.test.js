@@ -114,9 +114,9 @@ test("Codex Spark usage limits are wired through macOS consumers", () => {
   assert.ok(model.includes('case sparkPrimaryWindow = "spark_primary_window"'));
   assert.ok(model.includes('case sparkSecondaryWindow = "spark_secondary_window"'));
 
-  assert.match(usageLimitsView, /if let w = codex\.sparkPrimaryWindow \{\s*limitRow\(label: "Spark 5h"/);
-  assert.match(usageLimitsView, /if let w = codex\.sparkSecondaryWindow \{\s*limitRow\(label: "Spark 7d"/);
-  assert.doesNotMatch(usageLimitsView, /limitRow\(label: "Sp [57][hd]"/);
+  assert.match(usageLimitsView, /if let w = c\.sparkPrimaryWindow \{ s\.append\(makeSpec\("Spark 5h"/);
+  assert.match(usageLimitsView, /if let w = c\.sparkSecondaryWindow \{ s\.append\(makeSpec\("Spark 7d"/);
+  assert.doesNotMatch(usageLimitsView, /makeSpec\("Sp [57][hd]"/);
 
   assert.match(widgetSnapshotWriter, /if let w = limits\.codex\.sparkPrimaryWindow \{\s*out\.append\(LimitProvider\([^)]*label: "Codex · Spark 5h"/);
   assert.match(widgetSnapshotWriter, /if let w = limits\.codex\.sparkSecondaryWindow \{\s*out\.append\(LimitProvider\([^)]*label: "Codex · Spark 7d"/);
@@ -162,8 +162,8 @@ test("Codex Spark usage limit labels use copy keys with compact defaults", () =>
 
   assert.match(copyCsv, /^limits\.label\.codex_spark_5h,.*"Spark 5h"/m);
   assert.match(copyCsv, /^limits\.label\.codex_spark_7d,.*"Spark 7d"/m);
-  assert.match(providerSpecs, /{ key: "spark-5h", labelKey: "limits\.label\.codex_spark_5h", window: data\.spark_primary_window }/);
-  assert.match(providerSpecs, /{ key: "spark-7d", labelKey: "limits\.label\.codex_spark_7d", window: data\.spark_secondary_window }/);
+  assert.match(providerSpecs, /{ key: "spark-5h", labelKey: "limits\.label\.codex_spark_5h", window: data\.spark_primary_window, windowSecondsField: "limit_window_seconds" }/);
+  assert.match(providerSpecs, /{ key: "spark-7d", labelKey: "limits\.label\.codex_spark_7d", window: data\.spark_secondary_window, windowSecondsField: "limit_window_seconds" }/);
   assert.doesNotMatch(providerSpecs, /label: "Spark [57][hd]"/);
 
   for (const locale of ["zh", "zh-TW", "ja", "ko"]) {
