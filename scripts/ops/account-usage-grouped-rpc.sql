@@ -117,12 +117,29 @@ AS $func$
     -- (distinct machines rarely hit an identical model+half-hour), and measured
     -- against real heavy multi-machine users it lands far closer to truth than
     -- the systemic ~2x the fold-then-SUM produced.
+    -- WITHIN each machine CLUSTER pick ONE canonical whole row per
+    -- (hour, source, model) [largest total_tokens], THEN SUM across clusters.
+    -- A physical machine's device-id splits (identity drift / replay / a CLI +
+    -- dashboard reading the same logs out of sync) share a cluster -> deduped to
+    -- the max (no inflation). Two GENUINELY distinct machines fall in separate
+    -- clusters -> summed (issue #187 fix that doesn't lose real multi-machine
+    -- usage). Cluster membership is precomputed in tokentracker_device_machine by
+    -- VALUE consistency (equal/covered overlap = same machine; concurrent
+    -- independent values = distinct). Devices absent from that table cluster as
+    -- themselves (device_id), so a lone device sums as one cluster.
+    -- Emit ONE canonical whole row per (machine_cluster, hour, source, model).
+    -- The cluster is in DISTINCT ON / ORDER BY but NOT selected, so same-machine
+    -- device-id splits collapse to one row (max) while distinct machines emit one
+    -- row each on the same (hour,source,model). Stage-2 `grouped` SUMs them by
+    -- (bucket,source,model) -> within-cluster max, cross-cluster sum, in one pass
+    -- (no extra GROUP BY here -- the whole-history leaderboard variant 502s with
+    -- a second aggregation pass).
     SELECT mac.hour_start, mac.source, mac.model,
       mac.total_tokens, mac.input_tokens, mac.output_tokens,
       mac.cached_input_tokens, mac.cache_creation_input_tokens,
       mac.reasoning_output_tokens, mac.conversations
     FROM (
-      SELECT DISTINCT ON (h.hour_start, h.source, h.model)
+      SELECT DISTINCT ON (COALESCE(dm.machine_cluster_id, h.device_id::text), h.hour_start, h.source, h.model)
         h.hour_start, h.source, h.model,
         h.total_tokens::bigint                AS total_tokens,
         h.input_tokens::bigint                AS input_tokens,
@@ -132,12 +149,14 @@ AS $func$
         h.reasoning_output_tokens::bigint     AS reasoning_output_tokens,
         h.conversations::bigint               AS conversations
       FROM tokentracker_hourly h CROSS JOIN cfg
+      LEFT JOIN tokentracker_device_machine dm ON dm.device_id = h.device_id
       WHERE h.user_id = p_user_id
         AND h.hour_start >= p_from
         AND h.hour_start <  p_to
         AND NOT (h.source = ANY(cfg.account_sources))
         AND h.device_id = ANY(p_device_ids)
-      ORDER BY h.hour_start, h.source, h.model, h.total_tokens DESC, h.updated_at DESC
+      ORDER BY COALESCE(dm.machine_cluster_id, h.device_id::text),
+               h.hour_start, h.source, h.model, h.total_tokens DESC, h.updated_at DESC
     ) mac
 
     UNION ALL
