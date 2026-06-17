@@ -1114,7 +1114,7 @@ export default function IpCheckPage() {
               <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-oai-black dark:text-white mb-3">
                 {copy("ipcheck.page.title")}
               </h1>
-              <p className="text-oai-gray-500 dark:text-oai-gray-400 text-sm sm:text-base max-w-2xl">
+              <p className="text-oai-gray-500 dark:text-oai-gray-400 text-sm sm:text-base max-w-3xl text-pretty">
                 {copy("ipcheck.page.subtitle")}
               </p>
             </div>
