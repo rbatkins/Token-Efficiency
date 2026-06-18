@@ -7,7 +7,67 @@
 //   node scripts/fetch-usage-limits.js --json
 //   node scripts/fetch-usage-limits.js --markdown > usage-limits.md
 
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+
 const { getUsageLimits, resetUsageLimitsCache } = require("../src/lib/usage-limits");
+
+const MANUAL_LIMITS_PATH = path.resolve(__dirname, "..", "config", "tool-limits.json");
+const HOME = os.homedir();
+
+function loadManualLimits() {
+  try {
+    const raw = fs.readFileSync(MANUAL_LIMITS_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    delete parsed._meta;
+    return parsed;
+  } catch (_e) {
+    return {};
+  }
+}
+
+function isDroidInstalled() {
+  return fs.existsSync(path.join(HOME, ".factory", "sessions"));
+}
+
+function isOpencodeInstalled() {
+  return fs.existsSync(path.join(HOME, ".opencode")) || fs.existsSync(path.join(HOME, ".local", "share", "opencode"));
+}
+
+function isGrokInstalled() {
+  return fs.existsSync(path.join(HOME, ".grok"));
+}
+
+function isHermesInstalled() {
+  return fs.existsSync(path.join(HOME, ".hermes"));
+}
+
+const INSTALL_CHECKERS = {
+  droid: isDroidInstalled,
+  opencode: isOpencodeInstalled,
+  grok: isGrokInstalled,
+  hermes: isHermesInstalled,
+};
+
+function buildPassiveProviders() {
+  const limits = loadManualLimits();
+  const out = {};
+  for (const [tool, cfg] of Object.entries(limits)) {
+    const installed = INSTALL_CHECKERS[tool]?.() || false;
+    out[tool] = {
+      configured: installed,
+      error: installed ? null : "not installed",
+      plan_label: cfg.plan || "unknown",
+      monthly_cost_usd: cfg.monthly_cost_usd ?? null,
+      monthly_token_cap: cfg.monthly_token_cap ?? null,
+      monthly_et_cap: cfg.monthly_et_cap ?? null,
+      notes: cfg.notes || null,
+      _manual: true,
+    };
+  }
+  return out;
+}
 
 function pctBar(pct, width = 20) {
   if (pct === null || pct === undefined || !Number.isFinite(pct)) return "[unknown]";
@@ -51,6 +111,12 @@ function formatProvider(name, data) {
   if (data.seven_day) lines.push(formatWindow("7-day", data.seven_day));
   if (data.seven_day_opus) lines.push(formatWindow("7-day Opus", data.seven_day_opus));
   if (data.extra_usage != null) lines.push(`  extra usage: ${data.extra_usage}`);
+  if (data._manual) {
+    if (data.monthly_cost_usd != null) lines.push(`  monthly cost: $${data.monthly_cost_usd}`);
+    if (data.monthly_token_cap != null) lines.push(`  monthly token cap: ${data.monthly_token_cap.toLocaleString()}`);
+    if (data.monthly_et_cap != null) lines.push(`  monthly ET cap: ${data.monthly_et_cap.toLocaleString()}`);
+    if (data.notes) lines.push(`  note: ${data.notes}`);
+  }
   return lines;
 }
 
@@ -72,6 +138,12 @@ function toMarkdown(data) {
   for (const [name, provider] of Object.entries(data)) {
     if (name === "fetched_at") continue;
     const plan = provider.plan_label || (provider.configured === false ? "not configured" : "unknown");
+    if (provider._manual) {
+      const cap = provider.monthly_token_cap != null ? `${provider.monthly_token_cap.toLocaleString()} tokens/mo` : provider.monthly_et_cap != null ? `${provider.monthly_et_cap.toLocaleString()} ET/mo` : "manual cap";
+      const status = provider.configured ? `manual — ${cap}` : "not installed";
+      lines.push(`| ${name} | ${plan} | — | — | — | ${status} |`);
+      continue;
+    }
     if (provider.error) {
       lines.push(`| ${name} | ${plan} | — | — | — | ⚠️ ${provider.error} |`);
       continue;
@@ -122,6 +194,14 @@ async function main() {
   if (refresh) resetUsageLimitsCache();
 
   const data = await getUsageLimits({});
+  const passive = buildPassiveProviders();
+  for (const [tool, provider] of Object.entries(passive)) {
+    if (data[tool]) {
+      data[tool] = { ...data[tool], ...provider };
+    } else {
+      data[tool] = provider;
+    }
+  }
 
   if (asJson) {
     const out = JSON.stringify(data, null, 2) + "\n";

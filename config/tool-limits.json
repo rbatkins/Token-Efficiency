@@ -1,0 +1,37 @@
+{
+  "_meta": {
+    "note": "Manual caps and subscriptions for tools that do not expose a live limit API. Edit this file to match your actual plans."
+  },
+  "droid": {
+    "brand": "Droid / Factory.ai",
+    "plan": "Pro",
+    "monthly_cost_usd": 20,
+    "monthly_token_cap": null,
+    "monthly_et_cap": null,
+    "notes": "Factory.ai stores limits server-side; set monthly_token_cap or monthly_et_cap manually if you know your cap."
+  },
+  "opencode": {
+    "brand": "OpenCode",
+    "plan": "mixed",
+    "monthly_cost_usd": 0,
+    "monthly_token_cap": null,
+    "monthly_et_cap": null,
+    "notes": "OpenCode can use local or cloud models; configure caps per provider/model in OpenCode itself."
+  },
+  "grok": {
+    "brand": "Grok Build",
+    "plan": "pay-as-you-go",
+    "monthly_cost_usd": 0,
+    "monthly_token_cap": null,
+    "monthly_et_cap": null,
+    "notes": "xAI API is pay-as-you-go; no fixed cap unless you set one in your xAI dashboard."
+  },
+  "hermes": {
+    "brand": "Hermes Agent",
+    "plan": "unknown",
+    "monthly_cost_usd": 0,
+    "monthly_token_cap": null,
+    "monthly_et_cap": null,
+    "notes": "Hermes usage is local/logged; no known live limit API."
+  }
+}
