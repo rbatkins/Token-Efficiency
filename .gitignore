@@ -101,5 +101,6 @@ promo-video/
 # Local skill tooling lockfile (hyperframes — not part of the repo)
 skills-lock.json
 
-# SupaBrain auto-generated usage snapshot (regenerated locally by sync script)
+# SupaBrain auto-generated usage snapshots (regenerated locally by sync scripts)
 token-efficiency-supabrain.md
+token-efficiency-limits.md

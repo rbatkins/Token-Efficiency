@@ -116,18 +116,32 @@ async function main() {
   const asJson = args.includes("--json");
   const asMarkdown = args.includes("--markdown");
   const refresh = args.includes("--refresh");
+  const outputArg = args.find((a) => a.startsWith("--output="));
+  const outputPath = outputArg ? outputArg.slice("--output=".length) : null;
 
   if (refresh) resetUsageLimitsCache();
 
   const data = await getUsageLimits({});
 
   if (asJson) {
-    process.stdout.write(JSON.stringify(data, null, 2) + "\n");
+    const out = JSON.stringify(data, null, 2) + "\n";
+    if (outputPath) {
+      require("node:fs").writeFileSync(outputPath, out, "utf8");
+      console.log(`Wrote ${outputPath}`);
+    } else {
+      process.stdout.write(out);
+    }
     return;
   }
 
   if (asMarkdown) {
-    process.stdout.write(toMarkdown(data));
+    const out = toMarkdown(data);
+    if (outputPath) {
+      require("node:fs").writeFileSync(outputPath, out, "utf8");
+      console.log(`Wrote ${outputPath}`);
+    } else {
+      process.stdout.write(out);
+    }
     return;
   }
 
