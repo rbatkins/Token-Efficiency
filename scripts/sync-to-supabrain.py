@@ -27,6 +27,8 @@ QUEUE_FILE = TOKENTRACKER_DIR / "queue.jsonl"
 PROJECT_QUEUE_FILE = TOKENTRACKER_DIR / "project.queue.jsonl"
 PRICING_CACHE_FILE = Path.home() / ".tokentracker" / "cache" / "pricing.json"
 CURATED_OVERRIDES_FILE = Path(__file__).parent.parent / "src" / "lib" / "pricing" / "curated-overrides.json"
+TASK_TYPE_RULES_FILE = Path(__file__).parent.parent / "config" / "task-type-rules.json"
+TASK_TYPE_OVERRIDES_FILE = Path(__file__).parent.parent / "config" / "task-type-overrides.json"
 LITELLM_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 OUT_FILE = Path("token-efficiency-supabrain.md")
 
@@ -278,6 +280,56 @@ def load_pricing_cache(fetch_live: bool = False) -> dict[str, Any]:
     return json.loads(PRICING_CACHE_FILE.read_text(encoding="utf-8"))
 
 
+def load_task_type_rules() -> dict[str, Any]:
+    rules: dict[str, Any] = {"rules": [], "fallback": "Implementation"}
+    if TASK_TYPE_RULES_FILE.exists():
+        rules = json.loads(TASK_TYPE_RULES_FILE.read_text(encoding="utf-8"))
+    return rules
+
+
+def load_task_type_overrides() -> list[dict[str, Any]]:
+    if not TASK_TYPE_OVERRIDES_FILE.exists():
+        return []
+    parsed = json.loads(TASK_TYPE_OVERRIDES_FILE.read_text(encoding="utf-8"))
+    return list(parsed.get("overrides", []))
+
+
+def _matches_pattern_row(patterns: dict[str, list[str]], row: dict[str, Any]) -> bool:
+    for field, values in patterns.items():
+        if not values:
+            continue
+        row_value = str(row.get(field, "") or "").lower()
+        if row_value and any(v.lower() in row_value for v in values):
+            return True
+    return False
+
+
+def _matches_pattern_override(entry: dict[str, Any], row: dict[str, Any]) -> bool:
+    for field in ("source", "model", "project_key"):
+        if field not in entry:
+            continue
+        row_value = str(row.get(field, "") or "").lower()
+        entry_value = str(entry[field] or "").lower()
+        if entry_value and entry_value not in row_value:
+            return False
+    return True
+
+
+def classify_task_type(
+    row: dict[str, Any],
+    rules: dict[str, Any],
+    overrides: list[dict[str, Any]],
+) -> str:
+    for override in overrides:
+        if _matches_pattern_override(override, row):
+            return str(override.get("task_type", rules.get("fallback", "Implementation")))
+    for rule in rules.get("rules", []):
+        patterns = rule.get("patterns", {})
+        if _matches_pattern_row(patterns, row):
+            return str(rule.get("task_type", rules.get("fallback", "Implementation")))
+    return str(rules.get("fallback", "Implementation"))
+
+
 def model_multiplier(model: str) -> float:
     m = model.lower()
     if any(x in m for x in ("haiku", "fable-5")) and "thinking" not in m:
@@ -367,6 +419,8 @@ def main() -> int:
     curated = load_curated_overrides()
     pricing_raw = load_pricing_cache(fetch_live=args.fetch_live)
     litellm = build_litellm_per_million_map(pricing_raw)
+    task_rules = load_task_type_rules()
+    task_overrides = load_task_type_overrides()
 
     totals = {
         "input_tokens": sum(r.get("input_tokens", 0) for r in rows),
@@ -384,6 +438,7 @@ def main() -> int:
     by_source: dict[str, dict[str, Any]] = defaultdict(lambda: {"tokens": 0, "et": 0.0, "cost": 0.0, "conversations": 0})
     by_model: dict[str, dict[str, Any]] = defaultdict(lambda: {"tokens": 0, "et": 0.0, "cost": 0.0, "conversations": 0, "buckets": 0, "pricing_source": "miss"})
     by_project: dict[str, dict[str, Any]] = defaultdict(lambda: {"tokens": 0, "et": 0.0, "cost": 0.0, "conversations": 0})
+    by_task_type: dict[str, dict[str, Any]] = defaultdict(lambda: {"tokens": 0, "et": 0.0, "cost": 0.0, "conversations": 0, "buckets": 0})
 
     pricing_misses: set[str] = set()
 
@@ -399,6 +454,8 @@ def main() -> int:
 
         if not pricing_result["hit"]:
             pricing_misses.add(f"{source}/{model}")
+
+        task_type = classify_task_type(r, task_rules, task_overrides)
 
         totals["et"] += et
         totals["cost"] += cost
@@ -416,6 +473,12 @@ def main() -> int:
         if pricing_result["hit"]:
             by_model[model]["pricing_source"] = pricing_result["source"]
 
+        by_task_type[task_type]["tokens"] += r.get("total_tokens", 0)
+        by_task_type[task_type]["et"] += et
+        by_task_type[task_type]["cost"] += cost
+        by_task_type[task_type]["conversations"] += r.get("conversation_count", 0)
+        by_task_type[task_type]["buckets"] += 1
+
     for r in project_rows:
         mult = model_multiplier(r.get("model", ""))
         et = effective_tokens(r, mult)
@@ -429,10 +492,12 @@ def main() -> int:
         by_project[key]["et"] += et
         by_project[key]["cost"] += cost
         by_project[key]["conversations"] += r.get("conversation_count", 0)
+        by_project[key]["task_type"] = classify_task_type({**r, "project_key": key}, task_rules, task_overrides)
 
     sorted_sources = sorted(by_source.items(), key=lambda x: x[1]["tokens"], reverse=True)
     sorted_models = sorted(by_model.items(), key=lambda x: x[1]["tokens"], reverse=True)
     sorted_projects = sorted(by_project.items(), key=lambda x: x[1]["tokens"], reverse=True)
+    sorted_task_types = sorted(by_task_type.items(), key=lambda x: x[1]["tokens"], reverse=True)
 
     earliest = min(r.get("hour_start", "9999-12-31") for r in rows)
     latest = max(r.get("hour_start", "0000-01-01") for r in rows)
@@ -477,6 +542,12 @@ SupaBrain ingestion; the canonical local data stays in `~/.tokentracker/tracker/
         tok_share = data["tokens"] / totals["total_tokens"] * 100 if totals["total_tokens"] else 0
         et_share = data["et"] / totals["et"] * 100 if totals["et"] else 0
         md += f"| {src} | {data['tokens']:,} | {data['et']:,.0f} | {format_usd(data['cost'])} | {tok_share:.1f}% | {et_share:.1f}% |\n"
+
+    md += "\n### By Task Type\n\n| Task Type | Tokens | ET | Cost | Buckets | Tok Share | ET Share |\n|-----------|-------:|---:|-----:|--------:|----------:|---------:|\n"
+    for task_type, data in sorted_task_types:
+        tok_share = data["tokens"] / totals["total_tokens"] * 100 if totals["total_tokens"] else 0
+        et_share = data["et"] / totals["et"] * 100 if totals["et"] else 0
+        md += f"| {task_type} | {data['tokens']:,} | {data['et']:,.0f} | {format_usd(data['cost'])} | {data['buckets']:,} | {tok_share:.1f}% | {et_share:.1f}% |\n"
 
     md += "\n### By Model (top 15)\n\n| Model | Tokens | ET | Cost | Buckets | Tok Share | ET Share | Pricing Source |\n|-------|-------:|---:|-----:|--------:|----------:|---------:|---------------:|\n"
     for model, data in sorted_models[:15]:

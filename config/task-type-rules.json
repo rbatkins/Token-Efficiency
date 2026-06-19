@@ -1,0 +1,92 @@
+{
+  "_meta": {
+    "note": "Heuristic task-type classification rules. Rules are evaluated in order; the first matching rule wins. Use config/task-type-overrides.json to force a task_type for specific source/model/project combinations."
+  },
+  "task_types": [
+    "Implementation",
+    "Design",
+    "Oversight",
+    "Debug",
+    "Refactor",
+    "Exploration"
+  ],
+  "rules": [
+    {
+      "task_type": "Oversight",
+      "patterns": {
+        "model": [
+          "agent_review",
+          "github_bugbot",
+          "review",
+          "audit",
+          "guard"
+        ],
+        "source": []
+      }
+    },
+    {
+      "task_type": "Debug",
+      "patterns": {
+        "model": [
+          "grok-build",
+          "debugger",
+          "fix",
+          "bug"
+        ],
+        "source": []
+      }
+    },
+    {
+      "task_type": "Design",
+      "patterns": {
+        "model": [
+          "claude-opus",
+          "claude-sonnet-thinking",
+          "gpt-5.5-high",
+          "o1",
+          "o3"
+        ],
+        "source": []
+      }
+    },
+    {
+      "task_type": "Refactor",
+      "patterns": {
+        "model": [
+          "composer-2.5-fast",
+          "composer-1",
+          "fast"
+        ],
+        "source": []
+      }
+    },
+    {
+      "task_type": "Exploration",
+      "patterns": {
+        "model": [
+          "claude-haiku",
+          "claude-3.5-haiku",
+          "gemini-flash-lite",
+          "gpt-4o-mini",
+          "mini"
+        ],
+        "source": []
+      }
+    },
+    {
+      "task_type": "Implementation",
+      "patterns": {
+        "model": [
+          "auto",
+          "gpt-5.3-codex",
+          "gpt-5.5",
+          "claude-sonnet",
+          "gemini-flash",
+          "gemini-pro"
+        ],
+        "source": []
+      }
+    }
+  ],
+  "fallback": "Implementation"
+}

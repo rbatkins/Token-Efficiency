@@ -104,3 +104,7 @@ skills-lock.json
 # SupaBrain auto-generated usage snapshots (regenerated locally by sync scripts)
 token-efficiency-supabrain.md
 token-efficiency-limits.md
+
+# Python runtime artifacts from sync scripts
+__pycache__/
+*.py[cod]

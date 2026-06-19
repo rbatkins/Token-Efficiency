@@ -1,0 +1,14 @@
+{
+  "_meta": {
+    "note": "Manual task-type overrides. Entries are matched in order; the first match wins. Any omitted field acts as a wildcard. These override the heuristic rules in config/task-type-rules.json."
+  },
+  "overrides": [
+    {
+      "source": "cursor",
+      "model": "auto",
+      "project_key": "rbatkins/Aegis",
+      "task_type": "Implementation",
+      "reason": "Aegis agent-mode work is primarily implementation"
+    }
+  ]
+}
