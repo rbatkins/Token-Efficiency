@@ -1,0 +1,41 @@
+{
+  "_meta": {
+    "note": "Code-quality collection configuration. The collector runs the configured commands, counts commits and closed issues, and combines the results with project-level token usage to compute quality/ET and quality/$."
+  },
+  "projects": {
+    "rbatkins/Aegis": {
+      "path": "C:\\Users\\Ricky\\Documents\\Code\\Aegis",
+      "github_repo": "rbatkins/Aegis",
+      "commands": {
+        "test": {
+          "cmd": "uv run python scripts/checks.py check-changed",
+          "cwd": "C:\\Users\\Ricky\\Documents\\Code\\Aegis",
+          "weight": 0.30,
+          "pass_regex": "passed|success",
+          "fail_regex": "failed|error|FAIL"
+        },
+        "lint": {
+          "cmd": "uv run python scripts/checks.py check-fast",
+          "cwd": "C:\\Users\\Ricky\\Documents\\Code\\Aegis",
+          "weight": 0.20,
+          "pass_regex": "passed|success",
+          "fail_regex": "failed|error|FAIL"
+        },
+        "typecheck": {
+          "cmd": "npm run typecheck",
+          "cwd": "C:\\Users\\Ricky\\Documents\\Code\\Aegis\\apps\\family-mobile",
+          "weight": 0.20,
+          "pass_regex": "success|0 errors",
+          "fail_regex": "error TS|failed"
+        }
+      },
+      "weights": {
+        "test_pass_rate": 0.30,
+        "lint_pass_rate": 0.20,
+        "typecheck_pass_rate": 0.20,
+        "bug_fix_rate": 0.20,
+        "commit_rate": 0.10
+      }
+    }
+  }
+}
