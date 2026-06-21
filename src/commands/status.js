@@ -41,6 +41,8 @@ const {
   resolveKiroCliDbPath,
   resolveCodebuddyHome,
   resolveCodebuddyProjectFiles,
+  resolveWorkbuddyHome,
+  resolveWorkbuddyProjectFiles,
   resolveOmpSessionFiles,
   resolveOmpAgentDir,
   resolvePiSessionFiles,
@@ -86,6 +88,10 @@ async function cmdStatus(argv = []) {
     process.env.CODEBUDDY_HOME || path.join(home, ".codebuddy"),
     "settings.json",
   );
+  const workbuddySettingsPath = path.join(
+    process.env.WORKBUDDY_HOME || path.join(home, ".workbuddy"),
+    "settings.json",
+  );
   const geminiConfigDir = resolveGeminiConfigDir({ home, env: process.env });
   const geminiSettingsPath = resolveGeminiSettingsPath({
     configDir: geminiConfigDir,
@@ -97,6 +103,7 @@ async function cmdStatus(argv = []) {
   const notifyPath = path.join(binDir, "notify.cjs");
   const claudeHookCommand = buildClaudeHookCommand(notifyPath);
   const codebuddyHookCommand = buildHookCommand(notifyPath, "codebuddy");
+  const workbuddyHookCommand = buildHookCommand(notifyPath, "workbuddy");
   const geminiHookCommand = buildGeminiHookCommand(notifyPath);
 
   const config = await readJson(configPath);
@@ -129,6 +136,10 @@ async function cmdStatus(argv = []) {
   const codebuddyHookConfigured = await isClaudeHookConfigured({
     settingsPath: codebuddySettingsPath,
     hookCommand: codebuddyHookCommand,
+  });
+  const workbuddyHookConfigured = await isClaudeHookConfigured({
+    settingsPath: workbuddySettingsPath,
+    hookCommand: workbuddyHookCommand,
   });
   const geminiHookConfigured = await isGeminiHookConfigured({
     settingsPath: geminiSettingsPath,
@@ -195,6 +206,14 @@ async function cmdStatus(argv = []) {
   const codebuddyInstalled = fssync.existsSync(codebuddyHome);
   const codebuddyFiles = codebuddyInstalled
     ? resolveCodebuddyProjectFiles(process.env)
+    : [];
+
+  // WorkBuddy — passive scan (sibling Claude-Code fork). Surface the recursive
+  // jsonl file count (main session logs + nested subagents) for operators.
+  const workbuddyHome = resolveWorkbuddyHome(process.env);
+  const workbuddyInstalled = fssync.existsSync(workbuddyHome);
+  const workbuddyFiles = workbuddyInstalled
+    ? resolveWorkbuddyProjectFiles(process.env)
     : [];
 
   // oh-my-pi — passive scan only (no hooks).
@@ -277,6 +296,7 @@ async function cmdStatus(argv = []) {
       opencode_plugin: opencodePluginConfigured,
       openclaw_session_plugin: Boolean(openclawSessionPluginState?.configured),
       codebuddy: Boolean(codebuddyHookConfigured),
+      workbuddy: Boolean(workbuddyHookConfigured),
       grok: Boolean(grokHookState?.configured),
     },
   });
@@ -309,6 +329,7 @@ async function cmdStatus(argv = []) {
         openclaw_session_plugin: Boolean(openclawSessionPluginState?.configured),
         openclaw_legacy: Boolean(openclawHookState?.configured),
         codebuddy: codebuddyInstalled ? Boolean(codebuddyHookConfigured) : null,
+        workbuddy: workbuddyInstalled ? Boolean(workbuddyHookConfigured) : null,
         grok: grokInstalled ? Boolean(grokHookState?.configured) : null,
       },
       providers: {
@@ -320,6 +341,9 @@ async function cmdStatus(argv = []) {
           : { installed: false },
         codebuddy: codebuddyInstalled
           ? { installed: true, files: codebuddyFiles.length }
+          : { installed: false },
+        workbuddy: workbuddyInstalled
+          ? { installed: true, files: workbuddyFiles.length }
           : { installed: false },
         omp: ompInstalled
           ? { installed: true, files: ompFiles.length }
@@ -405,6 +429,9 @@ async function cmdStatus(argv = []) {
         : null,
       codebuddyInstalled
         ? `- CodeBuddy hooks: ${codebuddyHookConfigured ? "set" : "unset"} (${codebuddyFiles.length} session jsonl file${codebuddyFiles.length !== 1 ? "s" : ""} found)`
+        : null,
+      workbuddyInstalled
+        ? `- WorkBuddy hooks: ${workbuddyHookConfigured ? "set" : "unset"} (${workbuddyFiles.length} session jsonl file${workbuddyFiles.length !== 1 ? "s" : ""} found)`
         : null,
       ompInstalled
         ? `- oh-my-pi: passive reader (${ompFiles.length} session jsonl file${ompFiles.length !== 1 ? "s" : ""} found)`

@@ -45,6 +45,8 @@ const {
   parseAntigravityIncremental,
   resolveCodebuddyProjectFiles,
   parseCodebuddyIncremental,
+  resolveWorkbuddyProjectFiles,
+  parseWorkbuddyIncremental,
   resolveKiroCliSessionFiles,
   resolveKiroCliDbPath,
   parseKiroCliIncremental,
@@ -859,6 +861,36 @@ async function cmdSync(argv) {
       }
     }
 
+    // ── WorkBuddy (passive ~/.workbuddy/projects/**/*.jsonl reader) ──
+    // Tencent's WorkBuddy is a Claude Code fork in the same family as CodeBuddy;
+    // usage rides on function_call records too (not only assistant messages) and
+    // sub-agent logs nest one level deeper, so the resolver recurses. See the
+    // parser comment in rollout.js for the cache-aware token math.
+    let workbuddyResult = { recordsProcessed: 0, eventsAggregated: 0, bucketsQueued: 0 };
+    const workbuddyFiles = resolveWorkbuddyProjectFiles(process.env);
+    if (workbuddyFiles.length > 0) {
+      if (progress?.enabled) {
+        progress.start(`Parsing WorkBuddy ${renderBar(0)} | buckets 0`);
+      }
+      try {
+        workbuddyResult = await parseWorkbuddyIncremental({
+          projectFiles: workbuddyFiles,
+          cursors,
+          queuePath,
+          env: process.env,
+          onProgress: (p) => {
+            if (!progress?.enabled) return;
+            const pct = p.total > 0 ? p.index / p.total : 1;
+            progress.update(
+              `Parsing WorkBuddy ${renderBar(pct)} ${formatNumber(p.index)}/${formatNumber(p.total)} files | buckets ${formatNumber(p.bucketsQueued)}`,
+            );
+          },
+        });
+      } catch (err) {
+        warnProviderParseFailure("WorkBuddy", err, opts);
+      }
+    }
+
     // ── oh-my-pi (passive ~/.omp/agent/sessions/**/*.jsonl reader) ──
     let ompResult = { recordsProcessed: 0, eventsAggregated: 0, bucketsQueued: 0 };
     const ompFiles = resolveOmpSessionFiles(process.env);
@@ -1155,6 +1187,7 @@ async function cmdSync(argv) {
         kimiResult.recordsProcessed +
         kimiCodeResult.recordsProcessed +
         codebuddyResult.recordsProcessed +
+        workbuddyResult.recordsProcessed +
         ompResult.recordsProcessed +
         piResult.recordsProcessed +
         craftResult.recordsProcessed +
@@ -1180,6 +1213,7 @@ async function cmdSync(argv) {
         kimiResult.bucketsQueued +
         kimiCodeResult.bucketsQueued +
         codebuddyResult.bucketsQueued +
+        workbuddyResult.bucketsQueued +
         ompResult.bucketsQueued +
         piResult.bucketsQueued +
         craftResult.bucketsQueued +

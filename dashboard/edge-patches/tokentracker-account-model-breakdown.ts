@@ -210,11 +210,11 @@ const MODEL_PRICING: Record<string, { input: number; output: number; cache_read:
   //    most commonly claude-sonnet-4). ──
   "kiro-agent": { input: 3, output: 15, cache_read: 0.3, cache_write: 3.75 },
   "kiro-cli-agent": { input: 3, output: 15, cache_read: 0.3, cache_write: 3.75 },
-  // ── Tencent CodeBuddy (hy3-preview family). Mirrored from
-  //    src/lib/local-api.js — Tencent has not published $/MTok rates so
-  //    these stay at 0. TODO: confirm Tencent hy3 pricing. ──
-  "hy3-preview-agent": { input: 0, output: 0, cache_read: 0 },
-  "hy3-preview": { input: 0, output: 0, cache_read: 0 },
+  // ── Tencent CodeBuddy / WorkBuddy (hy3-preview family). Tencent TokenHub
+  //    official rate: 1.2 / 0.4 (cache hit) / 4.0 RMB per MTok in/read/out,
+  //    converted at ~7.2 RMB/USD. DeepSeek-style cache: cache_write = input. ──
+  "hy3-preview-agent": { input: 0.167, output: 0.556, cache_read: 0.056, cache_write: 0.167 },
+  "hy3-preview": { input: 0.167, output: 0.556, cache_read: 0.056, cache_write: 0.167 },
   // ── Misc / Free ──
   "glm-4.7-free": { input: 0, output: 0, cache_read: 0 },
   "nemotron-3-super-free": { input: 0, output: 0, cache_read: 0 },
@@ -488,7 +488,14 @@ export default async function (req: Request): Promise<Response> {
   const sources = Array.from(bySource.values()).map((s) => {
     const models = Array.from(s.models.values())
       .map((m) => {
-        const p = getModelPricing(m.model);
+        // WorkBuddy's auto-router logs model="auto"; price it as its default
+        // Hunyuan model (hy3-preview-agent) so it isn't billed as Cursor's
+        // composer-1. Mirrors normalizeWorkbuddyModel in src/lib/pricing/matcher.js.
+        const modelForPricing =
+          s.source === "workbuddy" && (m.model || "").toLowerCase() === "auto"
+            ? "hy3-preview-agent"
+            : m.model;
+        const p = getModelPricing(modelForPricing);
         // Codex / every-code fold reasoning into output_tokens (OpenAI
         // convention), so charging reasoning again double-counts. Mirror the
         // guard in src/lib/pricing/index.js + tokentracker-leaderboard-refresh.ts.

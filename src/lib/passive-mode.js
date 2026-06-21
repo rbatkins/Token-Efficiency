@@ -86,7 +86,7 @@ function classifyWritableFailure(filePath) {
  * @param {string} opts.home  - user home directory
  * @param {Object} opts.hookStatus - per-provider hook-installed booleans
  *   (already collected by status.js); shape: { claude, gemini, codex,
- *   every_code, opencode, openclaw, codebuddy, grok }
+ *   every_code, opencode, openclaw, codebuddy, workbuddy, grok }
  * @returns {PassiveProvider[]}
  */
 function detectPassiveProviders({ home, hookStatus }) {
@@ -147,6 +147,16 @@ function detectPassiveProviders({ home, hookStatus }) {
     logsDir: path.join(home, ".codebuddy"),
     logsPredicate: (_full, name) => name === "projects" || name.endsWith(".jsonl"),
     settingsPath: path.join(home, ".codebuddy", "settings.json"),
+  }));
+
+  // WorkBuddy — sibling Claude-fork; hook in ~/.workbuddy/settings.json
+  out.push(buildEntry({
+    name: "workbuddy",
+    hookExpected: true,
+    hookInstalled: Boolean(hookStatus?.workbuddy),
+    logsDir: path.join(home, ".workbuddy"),
+    logsPredicate: (_full, name) => name === "projects" || name.endsWith(".jsonl"),
+    settingsPath: path.join(home, ".workbuddy", "settings.json"),
   }));
 
   return out;

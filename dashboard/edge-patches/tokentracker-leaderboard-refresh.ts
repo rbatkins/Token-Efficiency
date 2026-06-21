@@ -134,11 +134,11 @@ const MODEL_PRICING: Record<string, { input: number; output: number; cache_read:
   //    most commonly claude-sonnet-4). ──
   "kiro-agent": { input: 3, output: 15, cache_read: 0.3, cache_write: 3.75 },
   "kiro-cli-agent": { input: 3, output: 15, cache_read: 0.3, cache_write: 3.75 },
-  // ── Tencent CodeBuddy (hy3-preview family). Mirrored from
-  //    src/lib/local-api.js — Tencent has not published $/MTok rates so
-  //    these stay at 0. TODO: confirm Tencent hy3 pricing. ──
-  "hy3-preview-agent": { input: 0, output: 0, cache_read: 0 },
-  "hy3-preview": { input: 0, output: 0, cache_read: 0 },
+  // ── Tencent CodeBuddy / WorkBuddy (hy3-preview family). Tencent TokenHub
+  //    official rate: 1.2 / 0.4 (cache hit) / 4.0 RMB per MTok in/read/out,
+  //    converted at ~7.2 RMB/USD. DeepSeek-style cache: cache_write = input. ──
+  "hy3-preview-agent": { input: 0.167, output: 0.556, cache_read: 0.056, cache_write: 0.167 },
+  "hy3-preview": { input: 0.167, output: 0.556, cache_read: 0.056, cache_write: 0.167 },
   // ── Misc / Free ──
   "glm-4.7-free": { input: 0, output: 0, cache_read: 0 },
   "nemotron-3-super-free": { input: 0, output: 0, cache_read: 0 },
@@ -227,7 +227,14 @@ function getModelPricing(model: string) {
 }
 
 function computeRowCost(row: HourlyRow): number {
-  const p = getModelPricing(row.model);
+  // WorkBuddy's auto-router logs model="auto"; price it as its default Hunyuan
+  // model (hy3-preview-agent) so it isn't billed as Cursor's composer-1. Mirrors
+  // normalizeWorkbuddyModel in src/lib/pricing/matcher.js.
+  const modelForPricing =
+    row.source === "workbuddy" && (row.model || "").toLowerCase() === "auto"
+      ? "hy3-preview-agent"
+      : row.model;
+  const p = getModelPricing(modelForPricing);
   // For Codex-family rollouts, `output_tokens` already includes any reasoning
   // tokens (OpenAI API convention), so `reasoning_output_tokens * output_rate`
   // would double-charge the reasoning slice. Kept explicit for other sources

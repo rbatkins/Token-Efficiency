@@ -104,6 +104,7 @@ const SUPPORTED_PROVIDERS = [
   "Kimi Code",
   "oh-my-pi",
   "CodeBuddy",
+  "WorkBuddy",
   "Grok Build",
   "Kilo CLI",
   "Kilo Code",
@@ -375,6 +376,10 @@ function buildIntegrationTargets({ home, trackerDir, notifyPath }) {
   const codebuddyDir = process.env.CODEBUDDY_HOME || path.join(home, ".codebuddy");
   const codebuddySettingsPath = path.join(codebuddyDir, "settings.json");
   const codebuddyHookCommand = buildHookCommand(notifyPath, "codebuddy");
+  // WorkBuddy CLI (Tencent) is the same Claude-Code-fork hook schema as CodeBuddy.
+  const workbuddyDir = process.env.WORKBUDDY_HOME || path.join(home, ".workbuddy");
+  const workbuddySettingsPath = path.join(workbuddyDir, "settings.json");
+  const workbuddyHookCommand = buildHookCommand(notifyPath, "workbuddy");
   const geminiConfigDir = resolveGeminiConfigDir({ home, env: process.env });
   const geminiSettingsPath = resolveGeminiSettingsPath({ configDir: geminiConfigDir });
   const geminiHookCommand = buildGeminiHookCommand(notifyPath);
@@ -394,6 +399,9 @@ function buildIntegrationTargets({ home, trackerDir, notifyPath }) {
     codebuddyDir,
     codebuddySettingsPath,
     codebuddyHookCommand,
+    workbuddyDir,
+    workbuddySettingsPath,
+    workbuddyHookCommand,
     geminiConfigDir,
     geminiSettingsPath,
     geminiHookCommand,
@@ -578,6 +586,19 @@ async function applyIntegrationSetup({ home, trackerDir, notifyPath, notifyOrigi
     summary.push({ label: "CodeBuddy", status: "skipped", detail: "Config not found" });
   }
 
+  // WorkBuddy: sibling Claude-Code fork. Same SessionEnd hook → notify.cjs →
+  // tracker sync; passive scan still runs as a safety net.
+  const workbuddyDirExists = await isDir(context.workbuddyDir);
+  if (workbuddyDirExists) {
+    await upsertClaudeHook({
+      settingsPath: context.workbuddySettingsPath,
+      hookCommand: context.workbuddyHookCommand,
+    });
+    summary.push({ label: "WorkBuddy", status: "installed", detail: "Hooks installed" });
+  } else {
+    summary.push({ label: "WorkBuddy", status: "skipped", detail: "Config not found" });
+  }
+
   const openclawBefore = await probeOpenclawSessionPluginState({
     home,
     trackerDir,
@@ -699,6 +720,21 @@ async function previewIntegrations({ context }) {
     });
   } else {
     summary.push({ label: "CodeBuddy", status: "skipped", detail: "Config not found" });
+  }
+
+  const workbuddyDirExists = await isDir(context.workbuddyDir);
+  if (workbuddyDirExists) {
+    const configured = await isClaudeHookConfigured({
+      settingsPath: context.workbuddySettingsPath,
+      hookCommand: context.workbuddyHookCommand,
+    });
+    summary.push({
+      label: "WorkBuddy",
+      status: "installed",
+      detail: configured ? "Hooks already installed" : "Will install hooks",
+    });
+  } else {
+    summary.push({ label: "WorkBuddy", status: "skipped", detail: "Config not found" });
   }
 
   const geminiConfigExists = await isDir(context.geminiConfigDir);
@@ -949,7 +985,7 @@ try {
   const originalPath =
     source === 'every-code'
       ? codeOriginalPath
-      : source === 'claude' || source === 'opencode' || source === 'gemini' || source === 'codebuddy'
+      : source === 'claude' || source === 'opencode' || source === 'gemini' || source === 'codebuddy' || source === 'workbuddy'
         ? null
         : codexOriginalPath;
   if (originalPath) {

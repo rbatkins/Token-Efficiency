@@ -104,6 +104,22 @@ function normalizeClaudeModel(model) {
   return m;
 }
 
+// WorkBuddy's auto-router records the model as the literal "auto" and never
+// exposes the underlying model it picked. That collides with Cursor's curated
+// alias ("auto" -> "composer-1"), which would misprice WorkBuddy usage as
+// Cursor's Composer. Map it instead to hy3-preview-agent — WorkBuddy's default
+// Tencent Hunyuan model — mirroring how Cursor's "auto" maps to its own default
+// (composer-1). The auto-router can pick pricier models, so this can slightly
+// under-count, but it tracks the token cost of WorkBuddy's representative model
+// rather than an unrelated vendor's. (The raw "auto" string is still
+// stored/displayed; only the pricing lookup is remapped.)
+function normalizeWorkbuddyModel(model) {
+  if (typeof model === "string" && model.trim().toLowerCase() === "auto") {
+    return "hy3-preview-agent";
+  }
+  return model;
+}
+
 // Per-source model-name normalizers, applied at pricing-lookup time only (the
 // raw model name is preserved for storage/display). Add a source here when its
 // model strings don't match the LiteLLM/curated keys verbatim.
@@ -111,6 +127,7 @@ const SOURCE_MODEL_NORMALIZERS = {
   antigravity: normalizeAntigravityModel,
   claude: normalizeClaudeModel,
   zed: normalizeZedModel,
+  workbuddy: normalizeWorkbuddyModel,
 };
 
 // Memoise the sorted-by-length LiteLLM key list. Reverse-substring scan walks

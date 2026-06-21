@@ -4959,6 +4959,313 @@ async function parseCodebuddyIncremental({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// WorkBuddy — passive JSONL reader (~/.workbuddy/projects/<cwd>/**/*.jsonl)
+//
+// Tencent's WorkBuddy is a Claude-Code fork in the same "buddy" family as
+// CodeBuddy, but it differs from CodeBuddy's reader in three load-bearing ways
+// (each verified against real ~/.workbuddy logs, NOT assumed from CodeBuddy):
+//
+//   1. Usage lives on `function_call` records too — not only on
+//      `type=="message" && role=="assistant"`. Each LLM round-trip (whether it
+//      ends in a tool call or a text reply) carries its own providerData.rawUsage.
+//      We therefore aggregate EVERY record that has providerData.rawUsage and
+//      dedup per response id, instead of filtering by record type.
+//
+//   2. Sub-agent traffic is nested two levels deeper:
+//        ~/.workbuddy/projects/<cwd>/<sessionId>.jsonl                  (main)
+//        ~/.workbuddy/projects/<cwd>/<sessionId>/subagents/agent-*.jsonl (sub)
+//      CodeBuddy's resolver only globs the top level, so we recurse to pick up
+//      sub-agent usage (tool-results/*.txt are naturally skipped — not .jsonl).
+//
+//   3. rawUsage is OpenAI/DeepSeek-shaped and prompt_tokens is the FULL prompt
+//      (cache reads + cache writes + genuinely-new input). The cache split is
+//      mirrored two ways depending on which upstream the auto-router picked:
+//        • Anthropic-style: cache_read_input_tokens / cache_creation_input_tokens
+//        • DeepSeek/OpenAI-style: prompt_tokens_details.cached_tokens /
+//          prompt_cache_hit_tokens  (cache_creation_input_tokens then 0)
+//      Reasoning is reported inside completion_tokens (verified:
+//      rawUsage.total_tokens === prompt_tokens + completion_tokens).
+//
+//   Token math (matches the repo's queue convention; subtract BOTH cache reads
+//   AND cache writes from prompt_tokens — CodeBuddy's "prompt_tokens - cacheRead"
+//   only works because its cache_creation is always 0; WorkBuddy writes cache
+//   heavily, so the naive formula double-counts cache writes ~2x):
+//     cacheRead   = max(cache_read_input_tokens, prompt_tokens_details.cached_tokens,
+//                       prompt_cache_hit_tokens)
+//     cacheCreate = cache_creation_input_tokens
+//     input_tokens               = prompt_tokens - cacheRead - cacheCreate
+//     cached_input_tokens        = cacheRead
+//     cache_creation_input_tokens = cacheCreate
+//     reasoning_output_tokens    = completion_tokens_details.reasoning_tokens
+//     output_tokens              = completion_tokens - reasoning_output_tokens
+//     total_tokens               = sum of the above (== prompt_tokens + completion_tokens)
+//
+//   model is the auto-router placeholder ("auto") — WorkBuddy does not expose
+//   the underlying model in the log, so we emit it verbatim.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function resolveWorkbuddyHome(env = process.env) {
+  const home = env.HOME || require("node:os").homedir();
+  return env.WORKBUDDY_HOME || path.join(home, ".workbuddy");
+}
+
+function resolveWorkbuddyDefaultModel(env = process.env) {
+  const fallback = "auto";
+  try {
+    const settingsPath = path.join(resolveWorkbuddyHome(env), "settings.json");
+    const raw = fssync.readFileSync(settingsPath, "utf8");
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && typeof parsed.model === "string" && parsed.model.trim()) {
+      return parsed.model.trim();
+    }
+  } catch (_e) {
+    // settings missing or malformed — fall through
+  }
+  return fallback;
+}
+
+// Recursively collect every *.jsonl under ~/.workbuddy/projects so that
+// per-session conversation logs AND their nested subagents/agent-*.jsonl files
+// are both discovered. Non-.jsonl artefacts (tool-results/*.txt) are ignored.
+function resolveWorkbuddyProjectFiles(env = process.env) {
+  const projectsDir = path.join(resolveWorkbuddyHome(env), "projects");
+  if (!fssync.existsSync(projectsDir)) return [];
+  const files = [];
+  const walk = (dir) => {
+    let entries;
+    try { entries = fssync.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      let isDir = entry.isDirectory();
+      let isFile = entry.isFile();
+      // Resolve symlinks defensively (Dirent flags are false for symlinks).
+      if (!isDir && !isFile) {
+        try {
+          const st = fssync.statSync(full);
+          isDir = st.isDirectory();
+          isFile = st.isFile();
+        } catch { continue; }
+      }
+      if (isDir) walk(full);
+      else if (isFile && entry.name.endsWith(".jsonl")) files.push(full);
+    }
+  };
+  walk(projectsDir);
+  files.sort((a, b) => a.localeCompare(b));
+  return files;
+}
+
+async function parseWorkbuddyIncremental({
+  projectFiles,
+  cursors,
+  queuePath,
+  onProgress,
+  env,
+  defaultModel,
+} = {}) {
+  await ensureDir(path.dirname(queuePath));
+  const workbuddyState =
+    cursors.workbuddy && typeof cursors.workbuddy === "object" ? cursors.workbuddy : {};
+  const seenIds = new Set(
+    Array.isArray(workbuddyState.seenIds) ? workbuddyState.seenIds : [],
+  );
+  const fileOffsets =
+    workbuddyState.fileOffsets && typeof workbuddyState.fileOffsets === "object"
+      ? { ...workbuddyState.fileOffsets }
+      : {};
+
+  const files = Array.isArray(projectFiles)
+    ? projectFiles
+    : resolveWorkbuddyProjectFiles(env || process.env);
+  const fallbackModel = defaultModel || resolveWorkbuddyDefaultModel(env || process.env);
+
+  if (files.length === 0) {
+    cursors.workbuddy = {
+      ...workbuddyState,
+      seenIds: Array.from(seenIds),
+      fileOffsets,
+      updatedAt: new Date().toISOString(),
+    };
+    return { recordsProcessed: 0, eventsAggregated: 0, bucketsQueued: 0 };
+  }
+
+  const hourlyState = normalizeHourlyState(cursors?.hourly);
+  const touchedBuckets = new Set();
+  const cb = typeof onProgress === "function" ? onProgress : null;
+  let recordsProcessed = 0;
+  let eventsAggregated = 0;
+
+  for (let fileIdx = 0; fileIdx < files.length; fileIdx++) {
+    const filePath = files[fileIdx];
+    let stat;
+    try { stat = fssync.statSync(filePath); } catch { continue; }
+
+    const prevEntry = fileOffsets[filePath] || {};
+    const prevSize = Number(prevEntry.size) || 0;
+    const prevIno = prevEntry.ino;
+    // Re-read from start if file shrunk (truncate/rewrite) or inode changed
+    // (file deleted + recreated). Otherwise pick up after the last read offset.
+    const inodeChanged = typeof prevIno === "number" && prevIno !== stat.ino;
+    const startOffset = stat.size < prevSize || inodeChanged ? 0 : prevSize;
+    if (stat.size <= startOffset) continue;
+
+    let stream;
+    try {
+      stream = fssync.createReadStream(filePath, {
+        encoding: "utf8",
+        start: startOffset,
+      });
+    } catch { continue; }
+    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+
+    for await (const line of rl) {
+      if (!line || !line.trim()) continue;
+      let entry;
+      try { entry = JSON.parse(line); } catch { continue; }
+      if (!entry || typeof entry !== "object") continue;
+
+      // Usage is carried on ANY record with providerData.rawUsage — assistant
+      // messages AND function_call records. Aggregate them all; dedup per id.
+      const provider = entry.providerData;
+      const rawUsage = provider && typeof provider === "object" ? provider.rawUsage : null;
+      if (!rawUsage || typeof rawUsage !== "object") continue;
+
+      const sessionId =
+        typeof entry.sessionId === "string" && entry.sessionId
+          ? entry.sessionId
+          : path.basename(filePath, ".jsonl");
+      const tsMs =
+        Number.isFinite(Number(entry.timestamp)) && Number(entry.timestamp) > 0
+          ? Number(entry.timestamp)
+          : null;
+      // One usage record per LLM round-trip; the response id is the most stable
+      // dedup key, then providerData.messageId, then session+timestamp.
+      const messageId =
+        typeof entry.id === "string" && entry.id
+          ? entry.id
+          : typeof provider.messageId === "string" && provider.messageId
+            ? provider.messageId
+            : tsMs != null
+              ? `${sessionId}:${tsMs}`
+              : null;
+      if (!messageId) continue;
+      if (seenIds.has(messageId)) continue;
+
+      recordsProcessed++;
+
+      const promptTokens = toNonNegativeInt(rawUsage.prompt_tokens);
+      const completionTokens = toNonNegativeInt(rawUsage.completion_tokens);
+      const promptDetails =
+        rawUsage.prompt_tokens_details && typeof rawUsage.prompt_tokens_details === "object"
+          ? rawUsage.prompt_tokens_details
+          : {};
+      const completionDetails =
+        rawUsage.completion_tokens_details && typeof rawUsage.completion_tokens_details === "object"
+          ? rawUsage.completion_tokens_details
+          : {};
+
+      // Cache reads are mirrored across up to three fields depending on which
+      // upstream the auto-router used; take the largest non-zero mirror.
+      const cacheRead = Math.max(
+        toNonNegativeInt(rawUsage.cache_read_input_tokens),
+        toNonNegativeInt(promptDetails.cached_tokens),
+        toNonNegativeInt(rawUsage.prompt_cache_hit_tokens),
+      );
+      const cacheCreation = toNonNegativeInt(rawUsage.cache_creation_input_tokens);
+      // prompt_tokens is the FULL prompt: subtract BOTH reads and writes so
+      // input_tokens is pure non-cached input (no double-counting cache writes).
+      const inputTokens = Math.max(0, promptTokens - cacheRead - cacheCreation);
+      // completion_tokens INCLUDES reasoning (verified: total == prompt+completion).
+      const reasoningTokens = Math.min(completionTokens, toNonNegativeInt(completionDetails.reasoning_tokens));
+      const outputTokens = Math.max(0, completionTokens - reasoningTokens);
+
+      if (
+        inputTokens === 0 &&
+        outputTokens === 0 &&
+        cacheRead === 0 &&
+        cacheCreation === 0 &&
+        reasoningTokens === 0
+      ) {
+        seenIds.add(messageId);
+        continue;
+      }
+
+      if (tsMs == null) {
+        seenIds.add(messageId);
+        continue;
+      }
+      const tsIso = new Date(tsMs).toISOString();
+      const bucketStart = toUtcHalfHourStart(tsIso);
+      if (!bucketStart) continue;
+
+      const model =
+        normalizeModelInput(provider.model) ||
+        normalizeModelInput(provider.requestModelId) ||
+        normalizeModelInput(entry.model) ||
+        fallbackModel;
+
+      const delta = {
+        input_tokens: inputTokens,
+        cached_input_tokens: cacheRead,
+        cache_creation_input_tokens: cacheCreation,
+        output_tokens: outputTokens,
+        reasoning_output_tokens: reasoningTokens,
+        total_tokens:
+          inputTokens + outputTokens + cacheRead + cacheCreation + reasoningTokens,
+        conversation_count: 1,
+      };
+
+      const bucket = getHourlyBucket(hourlyState, "workbuddy", model, bucketStart);
+      addTotals(bucket.totals, delta);
+      touchedBuckets.add(bucketKey("workbuddy", model, bucketStart));
+      seenIds.add(messageId);
+      eventsAggregated++;
+
+      if (cb) {
+        cb({
+          index: fileIdx + 1,
+          total: files.length,
+          recordsProcessed,
+          eventsAggregated,
+          bucketsQueued: touchedBuckets.size,
+        });
+      }
+    }
+
+    let postStat = stat;
+    try { postStat = fssync.statSync(filePath); } catch {}
+    fileOffsets[filePath] = {
+      size: postStat.size,
+      mtimeMs: postStat.mtimeMs,
+      ino: postStat.ino,
+    };
+  }
+
+  // Cap dedup set to last 10k IDs to bound cursor state size — same convention
+  // as CodeBuddy/Kimi/Copilot so cursors.json doesn't grow unbounded.
+  const seenArr = Array.from(seenIds);
+  const cappedSeen =
+    seenArr.length > 10_000 ? seenArr.slice(seenArr.length - 10_000) : seenArr;
+
+  const bucketsQueued = await enqueueTouchedBuckets({
+    queuePath,
+    hourlyState,
+    touchedBuckets,
+  });
+  const updatedAt = new Date().toISOString();
+  hourlyState.updatedAt = updatedAt;
+  cursors.hourly = hourlyState;
+  cursors.workbuddy = {
+    ...workbuddyState,
+    seenIds: cappedSeen,
+    fileOffsets,
+    updatedAt,
+  };
+
+  return { recordsProcessed, eventsAggregated, bucketsQueued };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // oh-my-pi (omp) — passive JSONL reader (~/.omp/agent/sessions/**/*.jsonl)
 //
 // oh-my-pi writes one append-only JSONL per session:
@@ -8663,6 +8970,10 @@ module.exports = {
   resolveCodebuddyProjectFiles,
   resolveCodebuddyDefaultModel,
   parseCodebuddyIncremental,
+  resolveWorkbuddyHome,
+  resolveWorkbuddyProjectFiles,
+  resolveWorkbuddyDefaultModel,
+  parseWorkbuddyIncremental,
   resolveKiroCliSessionFiles,
   resolveKiroCliDbPath,
   parseKiroCliIncremental,

@@ -197,6 +197,8 @@ function DroidIcon({ size = 16, className = "" }) {
 const PROVIDER_ICON_MAP = {
   CLAUDE: ClaudeIcon,
   CODEBUDDY: CodeBuddyIcon,
+  // WorkBuddy ships the same Tencent "buddy" mascot mark as CodeBuddy.
+  WORKBUDDY: CodeBuddyIcon,
   CODEX: CodexIcon,
   COPILOT: CopilotIcon,
   CRAFT: CraftIcon,

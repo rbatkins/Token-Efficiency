@@ -21,6 +21,9 @@ const {
   parseCursorApiIncremental,
   resolveCodebuddyDefaultModel,
   resolveCodebuddyProjectFiles,
+  parseWorkbuddyIncremental,
+  resolveWorkbuddyDefaultModel,
+  resolveWorkbuddyProjectFiles,
   parseOmpIncremental,
   resolveOmpSessionFiles,
   parsePiIncremental,
@@ -4599,6 +4602,256 @@ test("resolveCodebuddyProjectFiles walks ~/.codebuddy/projects/<cwd>/*.jsonl and
     const files = resolveCodebuddyProjectFiles({ CODEBUDDY_HOME: tmp });
     assert.equal(files.length, 2);
     assert.ok(files.every((f) => f.endsWith(".jsonl")));
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WorkBuddy — passive ~/.workbuddy/projects/<cwd>/**/*.jsonl reader.
+// Tencent's WorkBuddy is a Claude-Code fork in the same family as CodeBuddy,
+// but usage rides on function_call records too (not just assistant messages),
+// sub-agent logs nest one level deeper, and prompt_tokens is the FULL prompt so
+// BOTH cache reads AND cache writes must be subtracted to get pure input. Each
+// rawUsage below is shaped from real ~/.workbuddy logs.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildWorkbuddyLine({
+  id,
+  type = "message",
+  role,
+  timestamp,
+  model = "auto",
+  rawUsage,
+  isSubAgent = false,
+}) {
+  const providerData = { model, requestModelId: model, requestModelName: model, messageId: `m-${id}` };
+  if (rawUsage) providerData.rawUsage = rawUsage;
+  if (isSubAgent) providerData.isSubAgent = true;
+  const record = { id, type, timestamp, sessionId: "wb-sess", providerData };
+  if (role) record.role = role;
+  return JSON.stringify(record);
+}
+
+test("parseWorkbuddyIncremental subtracts BOTH cache reads and writes from prompt_tokens (no ~2x inflation)", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tt-workbuddy-"));
+  try {
+    const projectDir = path.join(tmp, "projects", "encoded-cwd");
+    await fs.mkdir(projectDir, { recursive: true });
+
+    // Anthropic-style mirror (real record): cache_read + cache_creation set.
+    //   prompt=34869, read=33554, creation=1312 → input = 34869-33554-1312 = 3
+    const lines = [
+      buildWorkbuddyLine({
+        id: "wb-1",
+        type: "function_call", // usage rides on function_call, NOT an assistant message
+        timestamp: Date.UTC(2026, 3, 5, 14, 0, 0),
+        rawUsage: {
+          prompt_tokens: 34869,
+          completion_tokens: 63,
+          total_tokens: 34932,
+          prompt_tokens_details: { cached_tokens: 33554, reasoning_tokens: 0 },
+          completion_tokens_details: { reasoning_tokens: 0 },
+          cache_read_input_tokens: 33554,
+          cache_creation_input_tokens: 1312,
+        },
+      }),
+    ].join("\n");
+
+    const sessionFile = path.join(projectDir, "abc.jsonl");
+    await fs.writeFile(sessionFile, lines);
+
+    const queuePath = path.join(tmp, "queue.jsonl");
+    const cursors = { version: 1 };
+    const result = await parseWorkbuddyIncremental({
+      projectFiles: [sessionFile],
+      cursors,
+      queuePath,
+    });
+
+    assert.equal(result.eventsAggregated, 1, "function_call usage must be aggregated");
+    const entry = JSON.parse((await fs.readFile(queuePath, "utf8")).trim());
+    assert.equal(entry.source, "workbuddy");
+    assert.equal(entry.model, "auto");
+    // CRITICAL: input subtracts cache_read AND cache_creation. The naive
+    // CodeBuddy formula (prompt - cache_read = 1315) would double-count the
+    // 1312 cache-creation tokens that already sit in their own column.
+    assert.equal(entry.input_tokens, 3);
+    assert.equal(entry.cached_input_tokens, 33554);
+    assert.equal(entry.cache_creation_input_tokens, 1312);
+    assert.equal(entry.output_tokens, 63);
+    assert.equal(entry.reasoning_output_tokens, 0);
+    // total == prompt_tokens + completion_tokens (the provider's own total)
+    assert.equal(entry.total_tokens, 34932);
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("parseWorkbuddyIncremental reads DeepSeek-style cache mirror and subtracts reasoning from completion", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tt-workbuddy-"));
+  try {
+    const projectDir = path.join(tmp, "projects", "encoded-cwd");
+    await fs.mkdir(projectDir, { recursive: true });
+
+    // DeepSeek/OpenAI mirror (real record): cache read lives in
+    // prompt_tokens_details.cached_tokens / prompt_cache_hit_tokens, NOT in
+    // cache_read_input_tokens (which is 0). Reasoning sits inside completion.
+    //   prompt=31013, read=704, creation=0 → input = 30309
+    //   completion=206, reasoning=130 → output = 76
+    const line = buildWorkbuddyLine({
+      id: "wb-ds",
+      type: "function_call",
+      timestamp: Date.UTC(2026, 3, 5, 14, 0, 0),
+      rawUsage: {
+        prompt_tokens: 31013,
+        completion_tokens: 206,
+        total_tokens: 31219,
+        completion_tokens_details: { reasoning_tokens: 130 },
+        prompt_tokens_details: { cached_tokens: 704, reasoning_tokens: 0 },
+        prompt_cache_hit_tokens: 704,
+        prompt_cache_miss_tokens: 30309,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+      },
+    });
+    const sessionFile = path.join(projectDir, "ds.jsonl");
+    await fs.writeFile(sessionFile, line);
+
+    const queuePath = path.join(tmp, "queue.jsonl");
+    const cursors = { version: 1 };
+    await parseWorkbuddyIncremental({ projectFiles: [sessionFile], cursors, queuePath });
+
+    const entry = JSON.parse((await fs.readFile(queuePath, "utf8")).trim());
+    assert.equal(entry.input_tokens, 30309);
+    assert.equal(entry.cached_input_tokens, 704);
+    assert.equal(entry.cache_creation_input_tokens, 0);
+    assert.equal(entry.output_tokens, 76);
+    assert.equal(entry.reasoning_output_tokens, 130);
+    assert.equal(entry.total_tokens, 31219);
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("resolveWorkbuddyProjectFiles recurses into nested subagent logs and skips non-jsonl", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tt-workbuddy-"));
+  try {
+    const cwd = path.join(tmp, "projects", "encoded-cwd");
+    const subagents = path.join(cwd, "sess-1", "subagents");
+    const toolResults = path.join(cwd, "sess-1", "tool-results");
+    await fs.mkdir(subagents, { recursive: true });
+    await fs.mkdir(toolResults, { recursive: true });
+    await fs.writeFile(path.join(cwd, "sess-1.jsonl"), ""); // main session log
+    await fs.writeFile(path.join(subagents, "agent-aaa.jsonl"), ""); // nested sub-agent
+    await fs.writeFile(path.join(subagents, "agent-bbb.jsonl"), "");
+    await fs.writeFile(path.join(toolResults, "chatcmpl-tool-x.txt"), ""); // must be ignored
+
+    const files = resolveWorkbuddyProjectFiles({ WORKBUDDY_HOME: tmp });
+    assert.equal(files.length, 3, "main log + 2 nested subagent logs");
+    assert.ok(files.every((f) => f.endsWith(".jsonl")));
+    assert.ok(files.some((f) => f.includes(path.join("subagents", "agent-aaa.jsonl"))));
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("parseWorkbuddyIncremental dedupes by response id across runs and buckets by half-hour", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tt-workbuddy-"));
+  try {
+    const projectDir = path.join(tmp, "projects", "encoded-cwd");
+    await fs.mkdir(projectDir, { recursive: true });
+
+    const ts1 = Date.UTC(2026, 3, 5, 14, 0, 0);
+    const ts2 = Date.UTC(2026, 3, 5, 14, 35, 0);
+    const mk = (id, ts) =>
+      buildWorkbuddyLine({
+        id,
+        type: "function_call",
+        timestamp: ts,
+        rawUsage: {
+          prompt_tokens: 1000,
+          completion_tokens: 100,
+          total_tokens: 1100,
+          prompt_tokens_details: { cached_tokens: 0 },
+          completion_tokens_details: { reasoning_tokens: 0 },
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+        },
+      });
+    const lines = [mk("r-A", ts1), mk("r-B", ts2), mk("r-A", ts1)].join("\n"); // r-A dup
+    const sessionFile = path.join(projectDir, "session.jsonl");
+    await fs.writeFile(sessionFile, lines);
+
+    const queuePath = path.join(tmp, "queue.jsonl");
+    const cursors = { version: 1 };
+    const result = await parseWorkbuddyIncremental({
+      projectFiles: [sessionFile],
+      cursors,
+      queuePath,
+    });
+    assert.equal(result.eventsAggregated, 2, "duplicate response id dropped");
+
+    const buckets = (await fs.readFile(queuePath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+    assert.equal(buckets.length, 2);
+    assert.deepEqual(
+      buckets.map((b) => b.hour_start).sort(),
+      ["2026-04-05T14:00:00.000Z", "2026-04-05T14:30:00.000Z"],
+    );
+    assert.ok(cursors.workbuddy?.seenIds?.includes("r-A"));
+
+    // Second run on the same file — no new events.
+    const result2 = await parseWorkbuddyIncremental({
+      projectFiles: [sessionFile],
+      cursors,
+      queuePath,
+    });
+    assert.equal(result2.eventsAggregated, 0);
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("parseWorkbuddyIncremental emits provider.model verbatim (auto vs hy3) and falls back to 'auto'", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tt-workbuddy-"));
+  try {
+    assert.equal(resolveWorkbuddyDefaultModel({ WORKBUDDY_HOME: tmp }), "auto");
+
+    const projectDir = path.join(tmp, "projects", "encoded-cwd");
+    await fs.mkdir(projectDir, { recursive: true });
+    const usage = {
+      prompt_tokens: 500,
+      completion_tokens: 50,
+      total_tokens: 550,
+      prompt_tokens_details: { cached_tokens: 0 },
+      completion_tokens_details: { reasoning_tokens: 0 },
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+    };
+    const lines = [
+      buildWorkbuddyLine({ id: "m-auto", type: "function_call", timestamp: Date.UTC(2026, 3, 5, 9, 0, 0), model: "auto", rawUsage: usage }),
+      buildWorkbuddyLine({ id: "m-hy3", type: "function_call", timestamp: Date.UTC(2026, 3, 5, 9, 5, 0), model: "hy3-preview-agent", rawUsage: usage }),
+    ].join("\n");
+    await fs.writeFile(path.join(projectDir, "s.jsonl"), lines);
+
+    const queuePath = path.join(tmp, "queue.jsonl");
+    const cursors = { version: 1 };
+    await parseWorkbuddyIncremental({
+      projectFiles: [path.join(projectDir, "s.jsonl")],
+      cursors,
+      queuePath,
+      env: { WORKBUDDY_HOME: tmp },
+    });
+
+    const models = (await fs.readFile(queuePath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l).model)
+      .sort();
+    assert.deepEqual(models, ["auto", "hy3-preview-agent"]);
   } finally {
     await fs.rm(tmp, { recursive: true, force: true });
   }

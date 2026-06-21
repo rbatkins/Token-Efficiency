@@ -667,3 +667,42 @@ test("index: ensurePricingLoaded is idempotent (concurrent callers share one fet
   assert.equal(b.loaded, true);
   assert.equal(c.loaded, true);
 });
+
+test("WorkBuddy: hy3-preview-agent has real Hunyuan token pricing (not $0)", () => {
+  pricing.resetPricingForTests();
+  const hy3 = pricing.getModelPricing("hy3-preview-agent", { source: "workbuddy" });
+  // Tencent TokenHub: 1.2 / 0.4 / 4.0 RMB per MTok in/read/out at ~7.2 RMB/USD.
+  assert.equal(hy3.input, 0.167);
+  assert.equal(hy3.cache_read, 0.056);
+  assert.equal(hy3.output, 0.556);
+  assert.equal(hy3.cache_write, 0.167, "DeepSeek-style cache: write billed at input rate");
+});
+
+test("WorkBuddy: 'auto' router prices as hy3, NOT Cursor's composer-1 (Plan A)", () => {
+  pricing.resetPricingForTests();
+  const wbAuto = pricing.getModelPricing("auto", { source: "workbuddy" });
+  const hy3 = pricing.getModelPricing("hy3-preview-agent", { source: "workbuddy" });
+  assert.deepEqual(
+    { i: wbAuto.input, o: wbAuto.output, r: wbAuto.cache_read },
+    { i: hy3.input, o: hy3.output, r: hy3.cache_read },
+    "WorkBuddy auto must inherit hy3 pricing",
+  );
+  // Cursor's "auto" must remain composer-1 — the remap is source-scoped.
+  const cursorAuto = pricing.getModelPricing("auto", { source: "cursor" });
+  assert.equal(cursorAuto.input, 1.25, "Cursor auto still resolves to composer-1");
+});
+
+test("WorkBuddy: computeRowCost bills auto + hy3 rows at the hy3 rate", () => {
+  pricing.resetPricingForTests();
+  const row = (model) => ({
+    source: "workbuddy",
+    model,
+    input_tokens: 1_000_000,
+    cached_input_tokens: 0,
+    cache_creation_input_tokens: 0,
+    output_tokens: 0,
+    reasoning_output_tokens: 0,
+  });
+  assert.equal(pricing.computeRowCost(row("auto")), 0.167);
+  assert.equal(pricing.computeRowCost(row("hy3-preview-agent")), 0.167);
+});
