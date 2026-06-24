@@ -21,7 +21,7 @@ function lastFetchUrl() {
 
 describe("api device filter", () => {
   beforeEach(() => {
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ devices: [] }), {
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({}), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     })) as any;
