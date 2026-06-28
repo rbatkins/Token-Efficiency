@@ -14,26 +14,20 @@
 // scrape with the same env-var names. The cookie is sent verbatim as
 // `Cookie: auth=<OPENCODE_GO_AUTH_COOKIE>` per that reference.
 
-const SCRAPED_NUMBER_PATTERN = "(-?\\d+(?:\\.\\d+)?)";
+const SCRAPED_NUMBER_PATTERN = "([0-9]+(?:\\.[0-9]+)?)";
 
-const RE_ROLLING_PCT_FIRST = new RegExp(
-  `rollingUsage:\\$R\\[\\d+\\]=\\{[^}]*usagePercent:${SCRAPED_NUMBER_PATTERN}[^}]*resetInSec:${SCRAPED_NUMBER_PATTERN}[^}]*\\}`,
-);
-const RE_ROLLING_RESET_FIRST = new RegExp(
-  `rollingUsage:\\$R\\[\\d+\\]=\\{[^}]*resetInSec:${SCRAPED_NUMBER_PATTERN}[^}]*usagePercent:${SCRAPED_NUMBER_PATTERN}[^}]*\\}`,
-);
-const RE_WEEKLY_PCT_FIRST = new RegExp(
-  `weeklyUsage:\\$R\\[\\d+\\]=\\{[^}]*usagePercent:${SCRAPED_NUMBER_PATTERN}[^}]*resetInSec:${SCRAPED_NUMBER_PATTERN}[^}]*\\}`,
-);
-const RE_WEEKLY_RESET_FIRST = new RegExp(
-  `weeklyUsage:\\$R\\[\\d+\\]=\\{[^}]*resetInSec:${SCRAPED_NUMBER_PATTERN}[^}]*usagePercent:${SCRAPED_NUMBER_PATTERN}[^}]*\\}`,
-);
-const RE_MONTHLY_PCT_FIRST = new RegExp(
-  `monthlyUsage:\\$R\\[\\d+\\]=\\{[^}]*usagePercent:${SCRAPED_NUMBER_PATTERN}[^}]*resetInSec:${SCRAPED_NUMBER_PATTERN}[^}]*\\}`,
-);
-const RE_MONTHLY_RESET_FIRST = new RegExp(
-  `monthlyUsage:\\$R\\[\\d+\\]=\\{[^}]*resetInSec:${SCRAPED_NUMBER_PATTERN}[^}]*usagePercent:${SCRAPED_NUMBER_PATTERN}[^}]*\\}`,
-);
+// Match each window's fields anchor-free, instead of pinning the exact SSR
+// wrapper shape. opencode's hydration format around the data changes between
+// releases (it dropped the `:$R[N]={…}` wrapper our old regexes required, which
+// broke parsing in #225 even though auth worked and the page still carried the
+// numbers). The field names (rollingUsage/weeklyUsage/monthlyUsage with
+// usagePercent + resetInSec) are stable, so we anchor on those, the way
+// steipete/codexbar's OpenCodeGoUsageFetcher does. `[^}]*?` keeps each match
+// inside that window's own object, and `"?` tolerates both the unquoted SSR
+// form (`usagePercent:2`) and a quoted JSON form (`"usagePercent":2`).
+function windowFieldRegex(windowKey, field) {
+  return new RegExp(`${windowKey}[^}]*?${field}"?\\s*:\\s*${SCRAPED_NUMBER_PATTERN}`);
+}
 
 const DASHBOARD_URL_PREFIX = "https://opencode.ai/workspace/";
 const DASHBOARD_URL_SUFFIX = "/go";
@@ -57,8 +51,11 @@ function readConfig(env = process.env) {
 
 function clampPercent(value) {
   if (value === null || value === undefined || value === "") return null;
-  const n = Number(value);
+  let n = Number(value);
   if (!Number.isFinite(n)) return null;
+  // Some payloads encode the percentage as a 0–1 fraction (e.g. 0.02 for 2%).
+  // Scale only when strictly below 1 so a genuine "1" stays 1%, not 100%.
+  if (n > 0 && n < 1) n *= 100;
   if (n <= 0) return 0;
   if (n >= 100) return 100;
   return n;
@@ -73,24 +70,17 @@ function buildWindow({ usagePercent, resetInSec, nowMs }) {
   return { used_percent: pct, reset_at: resetAtIso };
 }
 
-function parseWindowUsage(html, rePctFirst, reResetFirst) {
-  const pctFirst = rePctFirst.exec(html);
-  if (pctFirst) {
-    const usagePercent = Number(pctFirst[1]);
-    const resetInSec = Number(pctFirst[2]);
-    if (Number.isFinite(usagePercent) && Number.isFinite(resetInSec)) {
-      return { usagePercent, resetInSec };
-    }
-  }
-  const resetFirst = reResetFirst.exec(html);
-  if (resetFirst) {
-    const resetInSec = Number(resetFirst[1]);
-    const usagePercent = Number(resetFirst[2]);
-    if (Number.isFinite(usagePercent) && Number.isFinite(resetInSec)) {
-      return { usagePercent, resetInSec };
-    }
-  }
-  return null;
+// Pull one window's usagePercent + resetInSec out of the page. The two fields
+// are matched independently (order-independent), so it survives field
+// reordering as well as wrapper changes.
+function parseWindowUsage(html, windowKey) {
+  const pctMatch = windowFieldRegex(windowKey, "usagePercent").exec(html);
+  if (!pctMatch) return null;
+  const usagePercent = Number(pctMatch[1]);
+  if (!Number.isFinite(usagePercent)) return null;
+  const resetMatch = windowFieldRegex(windowKey, "resetInSec").exec(html);
+  const resetInSec = resetMatch ? Number(resetMatch[1]) : 0;
+  return { usagePercent, resetInSec: Number.isFinite(resetInSec) ? resetInSec : 0 };
 }
 
 // Parse "1 hour 56 minutes" / "6 days 2 hours" / "26 days 17 hours" into
@@ -147,9 +137,9 @@ function parseDataSlotFormat(html) {
 }
 
 function extractWindows(html, nowMs) {
-  let rolling = parseWindowUsage(html, RE_ROLLING_PCT_FIRST, RE_ROLLING_RESET_FIRST);
-  let weekly = parseWindowUsage(html, RE_WEEKLY_PCT_FIRST, RE_WEEKLY_RESET_FIRST);
-  let monthly = parseWindowUsage(html, RE_MONTHLY_PCT_FIRST, RE_MONTHLY_RESET_FIRST);
+  let rolling = parseWindowUsage(html, "rollingUsage");
+  let weekly = parseWindowUsage(html, "weeklyUsage");
+  let monthly = parseWindowUsage(html, "monthlyUsage");
   // Fill any *individual* missing window from the data-slot HTML fallback.
   // Running the fallback only when all three fail loses the case where SSR
   // hydration exposes e.g. rollingUsage but drops weeklyUsage — we'd return

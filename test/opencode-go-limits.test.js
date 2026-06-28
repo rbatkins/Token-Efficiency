@@ -97,22 +97,24 @@ describe("parseHumanReadableTime", () => {
 });
 
 describe("parseWindowUsage", () => {
-  const reRolling = /rollingUsage:\$R\[\d+\]=\{[^}]*usagePercent:(-?\d+(?:\.\d+)?)[^}]*resetInSec:(-?\d+(?:\.\d+)?)[^}]*\}/;
-  const reResetFirst = /rollingUsage:\$R\[\d+\]=\{[^}]*resetInSec:(-?\d+(?:\.\d+)?)[^}]*usagePercent:(-?\d+(?:\.\d+)?)[^}]*\}/;
-  // Pct-first + reset-first pair for monthly (used to test the reset-first fixture).
-  const reMonthlyPctFirst = /monthlyUsage:\$R\[\d+\]=\{[^}]*usagePercent:(-?\d+(?:\.\d+)?)[^}]*resetInSec:(-?\d+(?:\.\d+)?)[^}]*\}/;
-  const reMonthlyResetFirst = /monthlyUsage:\$R\[\d+\]=\{[^}]*resetInSec:(-?\d+(?:\.\d+)?)[^}]*usagePercent:(-?\d+(?:\.\d+)?)[^}]*\}/;
   it("extracts usage + reset from the pct-first ordering", () => {
-    const out = parseWindowUsage(ssrHtml(), reRolling, reResetFirst);
+    const out = parseWindowUsage(ssrHtml(), "rollingUsage");
     assert.deepEqual(out, { usagePercent: 42, resetInSec: 12345 });
   });
   it("extracts usage + reset from the reset-first ordering", () => {
-    const out = parseWindowUsage(ssrHtmlResetFirst(), reMonthlyPctFirst, reMonthlyResetFirst);
+    const out = parseWindowUsage(ssrHtmlResetFirst(), "monthlyUsage");
     assert.deepEqual(out, { usagePercent: 7, resetInSec: 2592000 });
   });
-  it("returns null when neither ordering is present", () => {
-    const out = parseWindowUsage("<html>nope</html>", reRolling, reResetFirst);
+  it("returns null when the window is absent", () => {
+    const out = parseWindowUsage("<html>nope</html>", "rollingUsage");
     assert.equal(out, null);
+  });
+  it("parses a wrapper format without the legacy $R[N] anchor (#225 regression)", () => {
+    // opencode dropped the `:$R[N]={…}` SSR wrapper; field names are unchanged.
+    const html =
+      '{rollingUsage:{usagePercent:2,resetInSec:100},weeklyUsage:{usagePercent:17,resetInSec:200}}';
+    assert.deepEqual(parseWindowUsage(html, "rollingUsage"), { usagePercent: 2, resetInSec: 100 });
+    assert.deepEqual(parseWindowUsage(html, "weeklyUsage"), { usagePercent: 17, resetInSec: 200 });
   });
 });
 
