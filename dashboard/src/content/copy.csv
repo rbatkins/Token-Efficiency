@@ -595,6 +595,9 @@ limits.status.not_connected,ui,LimitsPage,UsageLimitsPanel,status_not_connected,
 limits.status.no_data,ui,LimitsPage,UsageLimitsPanel,status_no_data,"No live limit data returned",,active
 limits.status.all_hidden,ui,LimitsPage,UsageLimitsPanel,status_all_hidden,"All limit providers are hidden. Open display settings to show them.",,active
 shared.time.now,shared,*,Shared,time_now,"now",,active
+shared.time.m_ago,shared,*,Shared,time_m_ago,"{{n}}m",,active
+shared.time.h_ago,shared,*,Shared,time_h_ago,"{{n}}h",,active
+shared.time.d_ago,shared,*,Shared,time_d_ago,"{{n}}d",,active
 nav.ip_check,shared,*,Sidebar,nav_ip_check,Claude IP Check,,active
 nav.skills,shared,*,Sidebar,nav_skills,Skills,,active
 skills.page.title,ui,SkillsPage,SkillsPage,title,Skills,,active

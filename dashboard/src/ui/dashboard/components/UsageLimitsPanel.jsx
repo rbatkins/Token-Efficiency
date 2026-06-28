@@ -162,11 +162,11 @@ function ago(iso) {
   if (diff < 0) return null;
   const m = Math.floor(diff / 60000);
   if (m < 1) return copy("shared.time.now");
-  if (m < 60) return `${m}m`;
+  if (m < 60) return copy("shared.time.m_ago", { n: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
+  if (h < 24) return copy("shared.time.h_ago", { n: h });
   const d = Math.floor(h / 24);
-  return `${d}d`;
+  return copy("shared.time.d_ago", { n: d });
 }
 
 function ToolGroup({ name, providerId, children, expandable = false, expanded = false, onToggle, badge = null }) {

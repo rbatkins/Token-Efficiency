@@ -2144,19 +2144,6 @@ async function probeAntigravityPort(port, csrfToken, { timeoutMs, requestFn, sch
 }
 
 async function fetchAntigravityLimits({ home, commandRunner, requestFn, fetchImpl = fetch, timeoutMs = 8000, nowMs = Date.now() } = {}) {
-  const processInfo = await detectAntigravityProcess({ commandRunner });
-  if (!processInfo.configured) {
-    const cached = readAntigravityLimitsCache({ home, nowMs });
-    if (cached) return cached;
-    // No language server process and no cache — can't fetch live limits.
-    // The agy fallback was removed because it returns Google Cloud/Gemini
-    // quota data, not Antigravity-specific Claude/GPT quotas.
-    return { configured: true, error: "Antigravity IDE is not running. Launch Antigravity to see usage limits." };
-  }
-  if (processInfo.error) {
-    return { configured: true, error: processInfo.error };
-  }
-
   const finalize = (payload, normalizeOptions) => {
     const result = {
       configured: true,
@@ -2178,6 +2165,15 @@ async function fetchAntigravityLimits({ home, commandRunner, requestFn, fetchImp
   };
 
   try {
+    const processInfo = await detectAntigravityProcess({ commandRunner });
+    if (!processInfo.configured) {
+      const cached = readAntigravityLimitsCache({ home, nowMs });
+      if (cached) return cached;
+      return { configured: true, error: "Antigravity IDE is not running. Launch Antigravity to see usage limits." };
+    }
+    if (processInfo.error) {
+      return { configured: true, error: processInfo.error };
+    }
     const ports = await listAntigravityPorts(processInfo.pid, { commandRunner });
     let workingPort = null;
     let workingScheme = "https";

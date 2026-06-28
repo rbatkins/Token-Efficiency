@@ -178,7 +178,7 @@ describe("getUsageLimits antigravity cache", () => {
         JSON.stringify({
           antigravity: {
             primary_window: { used_percent: 42, reset_at: "2099-05-22T00:00:00.000Z" },
-            cached_at: "2026-06-25T00:00:00.000Z",
+            cached_at: new Date(Date.now() - 60_000).toISOString(),
           },
         }),
         "utf8",
