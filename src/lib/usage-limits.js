@@ -772,21 +772,6 @@ function loadGeminiCredentials({ home, env } = {}) {
   }
 }
 
-function resolveAgyHome({ home } = {}) {
-  return path.join(home || os.homedir(), ".gemini", "antigravity-cli");
-}
-
-function loadAgyCredentials({ home } = {}) {
-  const agyHome = resolveAgyHome({ home });
-  const tokenPath = path.join(agyHome, "antigravity-oauth-token");
-  if (!fs.existsSync(tokenPath)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(tokenPath, "utf8"));
-  } catch (_error) {
-    return null;
-  }
-}
-
 function resolveSymlinkOnce(filePath) {
   try {
     const resolved = fs.readlinkSync(filePath);
@@ -868,44 +853,6 @@ async function extractGeminiOauthClientCredentials({ commandRunner, home } = {})
   return null;
 }
 
-async function extractAgyOauthClientCredentials({ commandRunner } = {}) {
-  const result = await runCommand(commandRunner, "which", ["agy"], { timeout: 2000 });
-  const agyPath = typeof result?.stdout === "string" ? result.stdout.trim() : "";
-  if (!agyPath || !fs.existsSync(agyPath)) return null;
-
-  // Use grep to extract the OAuth client ID from the Go binary (faster than
-  // full strings on a ~170MB binary). The client_secret is not available as a
-  // plain-text string in agy's Go binary — it uses PKCE or a non-refreshable
-  // public client pattern — so we return an empty secret and let the caller
-  // decide whether to attempt a secret-less refresh.
-  const grepResult = await runCommand(commandRunner, "grep", [
-    "-a", "-o", "-m1", "-E",
-    "[0-9]+-[a-zA-Z0-9]+\\.apps\\.googleusercontent\\.com",
-    agyPath,
-  ], { timeout: 15000 });
-
-  // grep -m1 stops at the first matching LINE, but with -o it can emit
-  // multiple matches on that one line. Take only the first match.
-  const rawStdout = typeof grepResult?.stdout === "string" ? grepResult.stdout.trim() : "";
-  const clientId = rawStdout.split("\n")[0]?.trim() || "";
-  if (!clientId || clientId.length < 20) return null;
-  return { clientId, clientSecret: "" };
-}
-
-function formatOauthRefreshError(source) {
-  return `Gemini API error: Could not find ${source} OAuth configuration`;
-}
-
-// Try both gemini-cli and agy OAuth client credentials. Returns the first
-// successfully extracted set, or null if neither is available.
-async function extractAnyOauthClientCredentials({ commandRunner, home } = {}) {
-  const gemini = await extractGeminiOauthClientCredentials({ commandRunner, home }).catch(() => null);
-  if (gemini?.clientId && gemini?.clientSecret) return { ...gemini, source: "gemini-cli" };
-  const agy = await extractAgyOauthClientCredentials({ commandRunner }).catch(() => null);
-  if (agy?.clientId) return { ...agy, source: "agy" };
-  return null;
-}
-
 async function refreshGeminiAccessToken({
   refreshToken,
   home,
@@ -913,19 +860,17 @@ async function refreshGeminiAccessToken({
   fetchImpl = fetch,
   commandRunner,
 }) {
-  const oauthClient = await extractAnyOauthClientCredentials({ commandRunner, home });
-  if (!oauthClient?.clientId) {
-    throw new Error(formatOauthRefreshError("Gemini CLI or agy"));
+  const oauthClient = await extractGeminiOauthClientCredentials({ commandRunner, home });
+  if (!oauthClient?.clientId || !oauthClient?.clientSecret) {
+    throw new Error("Gemini API error: Could not find Gemini CLI OAuth configuration");
   }
 
   const body = new URLSearchParams({
     client_id: oauthClient.clientId,
+    client_secret: oauthClient.clientSecret,
+    refresh_token: refreshToken,
     grant_type: "refresh_token",
   });
-  if (oauthClient.clientSecret) {
-    body.set("client_secret", oauthClient.clientSecret);
-  }
-  body.set("refresh_token", refreshToken);
 
   const res = await fetchImpl("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -1058,34 +1003,6 @@ function normalizeGeminiQuotaResponse({ buckets, email, tier }) {
   };
 }
 
-async function fetchGeminiLimitsWithAgyToken(agyTokenData, { accessToken, fetchImpl, codeAssist }) {
-  const claims = decodeJwtPayload(accessToken);
-  const res = await fetchImpl("https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(codeAssist?.projectId ? { project: codeAssist.projectId } : {}),
-  });
-  if (res.status === 401) {
-    throw new Error("Not logged in to Gemini. Run 'gemini' in Terminal to authenticate.");
-  }
-  if (!res.ok) {
-    throw new Error(`Gemini API error: HTTP ${res.status}`);
-  }
-  const json = await res.json();
-  return {
-    configured: true,
-    error: null,
-    ...normalizeGeminiQuotaResponse({
-      buckets: json?.buckets,
-      email: claims?.email || null,
-      tier: codeAssist?.tier || null,
-    }),
-  };
-}
-
 async function fetchGeminiLimits({ home, env, fetchImpl = fetch, commandRunner } = {}) {
   if (!(await isBinaryAvailable("gemini", { commandRunner }))) {
     return { configured: false };
@@ -1093,6 +1010,9 @@ async function fetchGeminiLimits({ home, env, fetchImpl = fetch, commandRunner }
 
   const settings = loadGeminiSettings({ home, env });
   const selectedType = settings?.security?.auth?.selectedType ?? null;
+  if (!settings && !loadGeminiCredentials({ home, env })) {
+    return { configured: false };
+  }
   if (selectedType === "api-key") {
     return { configured: true, error: "Gemini API key auth not supported. Use Google account (OAuth) instead." };
   }
@@ -1101,30 +1021,49 @@ async function fetchGeminiLimits({ home, env, fetchImpl = fetch, commandRunner }
   }
 
   const creds = loadGeminiCredentials({ home, env });
-
   if (!creds?.access_token) {
-    if (!settings) {
-      return { configured: false };
-    }
     return { configured: true, error: "Not logged in to Gemini. Run 'gemini' in Terminal to authenticate." };
   }
 
-  // Shared helper: refresh token if expired, then fetch code assist + quota
-  const resolveWithCredentials = async (tokenData) => {
-    let accessToken = tokenData.access_token;
-    const expiry = Number(tokenData.expiry_date);
-    const refreshToken = tokenData.refresh_token;
-    if (Number.isFinite(expiry) && expiry > 0 && expiry < Date.now() && refreshToken) {
+  try {
+    let accessToken = creds.access_token;
+    const expiry = Number(creds.expiry_date);
+    if (Number.isFinite(expiry) && expiry > 0 && expiry < Date.now() && creds.refresh_token) {
       accessToken = await refreshGeminiAccessToken({
-        refreshToken, home, env, fetchImpl, commandRunner,
+        refreshToken: creds.refresh_token,
+        home,
+        env,
+        fetchImpl,
+        commandRunner,
       });
     }
-    const codeAssist = await loadGeminiCodeAssistStatus(accessToken, { fetchImpl });
-    return fetchGeminiLimitsWithAgyToken(tokenData, { accessToken, fetchImpl, codeAssist });
-  };
 
-  try {
-    return await resolveWithCredentials(creds);
+    const claims = decodeJwtPayload(creds.id_token);
+    const codeAssist = await loadGeminiCodeAssistStatus(accessToken, { fetchImpl });
+    const res = await fetchImpl("https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(codeAssist.projectId ? { project: codeAssist.projectId } : {}),
+    });
+    if (res.status === 401) {
+      throw new Error("Not logged in to Gemini. Run 'gemini' in Terminal to authenticate.");
+    }
+    if (!res.ok) {
+      throw new Error(`Gemini API error: HTTP ${res.status}`);
+    }
+    const json = await res.json();
+    return {
+      configured: true,
+      error: null,
+      ...normalizeGeminiQuotaResponse({
+        buckets: json?.buckets,
+        email: claims?.email || null,
+        tier: codeAssist.tier,
+      }),
+    };
   } catch (error) {
     return {
       configured: true,
@@ -2567,8 +2506,6 @@ module.exports = {
   resetUsageLimitsCache,
   runCommand,
   extractGeminiOauthClientCredentials,
-  extractAgyOauthClientCredentials,
-  loadAgyCredentials,
   loadKimiCredentials,
   normalizeCursorUsageSummary,
   normalizeGeminiQuotaResponse,

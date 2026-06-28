@@ -6,9 +6,7 @@ const path = require("node:path");
 
 const {
   extractGeminiOauthClientCredentials,
-  extractAgyOauthClientCredentials,
   getUsageLimits,
-  loadAgyCredentials,
   normalizePlanLabel,
   loadKimiCredentials,
   normalizeCursorUsageSummary,
@@ -110,128 +108,11 @@ describe("extractGeminiOauthClientCredentials", () => {
   });
 });
 
-describe("loadAgyCredentials", () => {
-  it("reads the agy OAuth token file from ~/.gemini/antigravity-cli", () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tokentracker-agy-creds-"));
-    try {
-      const agyHome = path.join(tmp, ".gemini", "antigravity-cli");
-      fs.mkdirSync(agyHome, { recursive: true });
-      fs.writeFileSync(
-        path.join(agyHome, "antigravity-oauth-token"),
-        JSON.stringify({
-          token: {
-            access_token: "ya29.agy-test-token",
-            refresh_token: "1//agy-refresh-token",
-            expiry: "2099-01-01T00:00:00Z",
-          },
-          auth_method: "consumer",
-        }),
-        "utf8",
-      );
-
-      const result = loadAgyCredentials({ home: tmp });
-      assert.notEqual(result, null);
-      assert.equal(result.token.access_token, "ya29.agy-test-token");
-      assert.equal(result.auth_method, "consumer");
-    } finally {
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-
-  it("returns null when the token file does not exist", () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tokentracker-agy-nofile-"));
-    try {
-      const result = loadAgyCredentials({ home: tmp });
-      assert.equal(result, null);
-    } finally {
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-});
-
-describe("extractAgyOauthClientCredentials", () => {
-  it("extracts client ID from agy binary using grep", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tokentracker-agy-extract-"));
-    try {
-      const agyBin = path.join(tmp, "agy");
-      // Create a fake binary with the OAuth client ID as a string
-      fs.writeFileSync(
-        agyBin,
-        [
-          Buffer.alloc(64, 0).toString(),
-          "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com",
-          Buffer.alloc(32, 0).toString(),
-        ].join(""),
-        "binary",
-      );
-      fs.chmodSync(agyBin, 0o755);
-
-      const result = await extractAgyOauthClientCredentials({
-        commandRunner(command, args) {
-          if (command === "which") {
-            return { status: 0, stdout: `${agyBin}\n` };
-          }
-          if (command === "grep") {
-            // Simulate grep extracting the client ID
-            const content = fs.readFileSync(args[args.length - 1], "utf8");
-            const match = content.match(/[0-9]+-[a-zA-Z0-9]+\.apps\.googleusercontent\.com/);
-            return { status: match ? 0 : 1, stdout: match ? `${match[0]}\n` : "" };
-          }
-          return { status: 1, stdout: "" };
-        },
-      });
-
-      assert.notEqual(result, null);
-      assert.match(result.clientId, /1071006060591-tmhssin/);
-      assert.equal(result.clientSecret, ""); // agy binary doesn't expose secret
-    } finally {
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-
-  it("returns null when agy binary is not found", async () => {
-    const result = await extractAgyOauthClientCredentials({
-      commandRunner() {
-        return { status: 1, stdout: "" };
-      },
-    });
-    assert.equal(result, null);
-  });
-});
-
 describe("getUsageLimits gemini no-creds", () => {
   it("returns configured:false when no gemini credentials exist", async () => {
     resetUsageLimitsCache();
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tokentracker-limits-gemini-none-"));
     try {
-      const result = await getUsageLimits({
-        home: tmp,
-        platform: "linux",
-        providerTimeoutMs: 1000,
-        securityRunner() { return { status: 1, stdout: "" }; },
-        commandRunner() { return { status: 1, stdout: "" }; },
-        fetchImpl() { return new Promise(() => {}); },
-      });
-
-      assert.equal(result.gemini.configured, false);
-    } finally {
-      resetUsageLimitsCache();
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-
-  it("returns configured:false when gemini binary not installed even if settings.json exists", async () => {
-    resetUsageLimitsCache();
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tokentracker-limits-gemini-settings-"));
-    try {
-      const geminiHome = path.join(tmp, ".gemini");
-      fs.mkdirSync(geminiHome, { recursive: true });
-      fs.writeFileSync(
-        path.join(geminiHome, "settings.json"),
-        JSON.stringify({ security: { auth: { selectedType: "oauth" } } }),
-        "utf8",
-      );
-
       const result = await getUsageLimits({
         home: tmp,
         platform: "linux",
