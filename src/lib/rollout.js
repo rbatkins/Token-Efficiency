@@ -2553,22 +2553,31 @@ function readMimoDbMessages(dbPath, sqliteOptions = {}) {
 // ZCode is Z.ai's (Zhipu) coding agent — another OpenCode-fork that stores
 // assistant messages in the identical `message` table schema
 // (~/.zcode/cli/db/db.sqlite). Its own agent runs GLM models through Z.ai /
-// BigModel endpoints, tagged with a providerID like "builtin:zai-start-plan",
-// "builtin:zai-coding-plan", or "builtin:bigmodel-coding-plan". ZCode can ALSO
-// orchestrate bundled claude-code / codex / gemini-cli sub-agents; those turns
-// carry providerID "anthropic"/"openai"/"google" and are already counted by the
-// standalone Claude/Codex/Gemini parsers. Keep ONLY ZCode-native (Z.ai /
-// BigModel / Zhipu) rows so we never double-count. Key off providerID, NEVER the
-// model id — a GLM model the user ran *inside* Claude Code is source=claude, so
-// matching "glm" on the model would re-count it. Mirrors the Mimo discipline.
+// BigModel endpoints (providerID "builtin:zai-start-plan",
+// "builtin:bigmodel-coding-plan", …), but ZCode also lets users add CUSTOM
+// providers (a built-in feature beyond the Z.ai plan subscription) that point at
+// ANY model — MiMo, Sakana Fugu, any OpenAI-compatible proxy. A user-defined
+// provider is assigned a random UUID as its providerID (observed on a real box:
+// model "mimo-v2.5-pro" under providerID "265956bf-…"), so an allowlist of known
+// vendor keywords can NEVER match it and silently drops every custom-provider
+// turn (issue #216). Those turns live ONLY in this DB, so we must keep them or
+// they go uncounted entirely. The exception is the bundled
+// claude-code / codex / gemini-cli sub-agents ZCode can orchestrate: those carry
+// providerID "anthropic"/"openai"/"google" and write to ~/.claude / ~/.codex /
+// ~/.gemini, so the standalone Claude/Codex/Gemini parsers already count them —
+// DROP those here to avoid double-counting. Hence a blocklist (exclude the three
+// direct vendors), not an allowlist that would silently miss every third-party
+// model. Key off providerID, NEVER the model id — a GLM/Claude model the user
+// ran *inside* Claude Code is source=claude, so matching the model name would
+// re-count it. Mirrors the Mimo discipline.
 function isZcodeNativeMessage(data) {
   if (!data) return false;
   const provider = String(data.providerID || "").toLowerCase();
-  return (
-    provider.includes("zai") ||
-    provider.includes("bigmodel") ||
-    provider.includes("zcode") ||
-    provider.includes("zhipu")
+  if (!provider) return false;
+  return !(
+    provider.includes("anthropic") ||
+    provider.includes("openai") ||
+    provider.includes("google")
   );
 }
 

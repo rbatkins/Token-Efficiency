@@ -307,6 +307,7 @@ function renderProviderGroup(id, data, mode, expanded, onToggle) {
     return (
       <ToolGroup key={id} name={limitProviderName(id)} providerId={id}>
         <StatusLine>{copy("limits.status.not_connected")}</StatusLine>
+        {id === "opencodeGo" ? <OpenCodeGoSetupHint /> : null}
       </ToolGroup>
     );
   }
@@ -314,6 +315,7 @@ function renderProviderGroup(id, data, mode, expanded, onToggle) {
     return (
       <ToolGroup key={id} name={limitProviderName(id)} providerId={id}>
         <StatusLine tone="error">{copy("shared.error.prefix", { error: data.error })}</StatusLine>
+        {id === "opencodeGo" ? <OpenCodeGoSetupHint /> : null}
       </ToolGroup>
     );
   }
@@ -359,6 +361,93 @@ function CopilotOtelHint({ defaultDir }) {
   );
 }
 
+function HintStep({ n, children }) {
+  return (
+    <li className="flex gap-2.5">
+      <span className="mt-[1px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-oai-brand/15 text-[9px] font-semibold text-oai-brand">
+        {n}
+      </span>
+      <div className="min-w-0 flex-1 leading-snug">{children}</div>
+    </li>
+  );
+}
+
+function ExternalArrow() {
+  return (
+    <svg viewBox="0 0 12 12" aria-hidden="true" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4.5 2.75h4.75V7.5M9.25 2.75 3 9" />
+    </svg>
+  );
+}
+
+// OpenCode Go has no public quota API (anomalyco/opencode#16017), so limits are
+// read from the user's signed-in opencode.ai session via two env vars. The
+// macOS/Windows apps have no settings field for these yet, so this inline guide
+// shows up wherever OpenCode Go is enabled but unconfigured (or the cookie has
+// gone stale): sign in, grab two values, paste them in.
+function OpenCodeGoSetupHint() {
+  const [copied, setCopied] = useState(false);
+  const snippet = [
+    'export OPENCODE_GO_WORKSPACE_ID="wrk_..."',
+    'export OPENCODE_GO_AUTH_COOKIE="..."',
+  ].join("\n");
+
+  const onCopy = async (e) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(snippet);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch (_e) {
+      // Clipboard can be unavailable in embedded or restricted contexts.
+    }
+  };
+
+  return (
+    <div className="mt-1.5 rounded-lg border border-oai-gray-200 dark:border-oai-gray-700/60 bg-oai-gray-50/50 dark:bg-oai-gray-900/20 p-3 text-[11px] text-oai-gray-600 dark:text-oai-gray-300">
+      <div className="text-[12px] font-semibold text-oai-gray-800 dark:text-oai-gray-100">{copy("limits.opencodeGo.setupHint.title")}</div>
+      <div className="mt-0.5 leading-snug text-oai-gray-500 dark:text-oai-gray-400">{copy("limits.opencodeGo.setupHint.subtitle")}</div>
+
+      <ol className="mt-2.5 space-y-2.5">
+        <HintStep n="1">
+          <div>{copy("limits.opencodeGo.setupHint.step1")}</div>
+          <a
+            href="https://opencode.ai"
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1 inline-flex items-center gap-1 rounded-md bg-oai-brand/10 px-2 py-1 font-medium text-oai-brand hover:bg-oai-brand/15 transition-colors"
+          >
+            {copy("limits.opencodeGo.setupHint.cta")}
+            <ExternalArrow />
+          </a>
+        </HintStep>
+        <HintStep n="2">
+          <div>{copy("limits.opencodeGo.setupHint.step2")}</div>
+          <ul className="mt-1 space-y-0.5 text-oai-gray-500 dark:text-oai-gray-400">
+            <li>{copy("limits.opencodeGo.setupHint.step2_workspace")}</li>
+            <li>{copy("limits.opencodeGo.setupHint.step2_cookie")}</li>
+          </ul>
+        </HintStep>
+        <HintStep n="3">
+          <div className="flex items-center gap-2">
+            <span>{copy("limits.opencodeGo.setupHint.step3")}</span>
+            <button
+              type="button"
+              onClick={onCopy}
+              className="shrink-0 rounded-md border border-oai-gray-300 dark:border-oai-gray-700 px-2 py-0.5 text-[10.5px] text-oai-gray-700 dark:text-oai-gray-200 hover:bg-oai-gray-100 dark:hover:bg-oai-gray-800 transition-colors"
+            >
+              {copied ? copy("limits.opencodeGo.setupHint.copied") : copy("limits.opencodeGo.setupHint.copy")}
+            </button>
+          </div>
+          <pre className="mt-1.5 overflow-x-auto rounded-md bg-oai-gray-100 dark:bg-oai-gray-900/60 px-2 py-1.5 font-mono text-[10.5px] leading-relaxed whitespace-pre">{snippet}</pre>
+          <div className="mt-1 text-[10px] text-oai-gray-400 dark:text-oai-gray-500">{copy("limits.opencodeGo.setupHint.note_app")}</div>
+        </HintStep>
+      </ol>
+    </div>
+  );
+}
+
 /**
  * Width of the widest rendered row label, so every label column matches it.
  * Mirrors the macOS popover behavior: bars stay aligned without reserving
@@ -393,8 +482,8 @@ function useWidestLabelWidth(containerRef) {
   return labelWidth;
 }
 
-export function UsageLimitsPanel({ claude, codex, cursor, gemini, kimi, kiro, grok, antigravity, copilot, zcode, order, visibility, displayMode }) {
-  const dataById = { claude, codex, cursor, gemini, kimi, kiro, grok, antigravity, copilot, zcode };
+export function UsageLimitsPanel({ claude, codex, cursor, gemini, kimi, kiro, grok, antigravity, copilot, zcode, opencodeGo, order, visibility, displayMode }) {
+  const dataById = { claude, codex, cursor, gemini, kimi, kiro, grok, antigravity, copilot, zcode, opencodeGo };
   const containerRef = useRef(null);
   const labelWidth = useWidestLabelWidth(containerRef);
   const [expandedId, setExpandedId] = useState(null);

@@ -529,6 +529,41 @@ test("index: getModelPricing resolves GLM-5.2 from CURATED for ZCode rows", asyn
   assert.equal(cost, 1.4);
 });
 
+test("index: getModelPricing resolves Sakana Fugu Ultra from CURATED (issue #214)", async () => {
+  pricing.resetPricingForTests();
+  const cachePath = tmpCachePath();
+  await pricing.ensurePricingLoaded({
+    cachePath,
+    fetchImpl: makeFetchImpl(FIXTURE_LITELLM),
+  });
+  // Fugu is an OpenAI-compatible API used through Codex/Cursor/Cline/ZCode etc.;
+  // its model id reaches the queue in several shapes. All must resolve to the
+  // curated $5/$30 rate or the dashboard renders $0 cost (it's absent from
+  // LiteLLM). OpenRouter list rates: $5 / $30 / $0.5 per 1M in/out/cache_read.
+  const exact = pricing.getModelPricing("sakana/fugu-ultra");
+  assert.equal(exact.input, 5);
+  assert.equal(exact.output, 30);
+  assert.equal(exact.cache_read, 0.5);
+  // Bare name, official dated id, and provider-prefixed form all hit the "fugu"
+  // curated fuzzy match.
+  for (const id of ["fugu-ultra", "fugu-ultra-20260615", "openrouter/sakana/fugu-ultra"]) {
+    const p = pricing.getModelPricing(id);
+    assert.equal(p.input, 5, `${id} input`);
+    assert.equal(p.output, 30, `${id} output`);
+  }
+  // End-to-end: a Fugu row carried by ZCode (issue #216) bills non-zero.
+  const cost = pricing.computeRowCost({
+    source: "zcode",
+    model: "fugu-ultra",
+    input_tokens: 1_000_000,
+    output_tokens: 1_000_000,
+    cached_input_tokens: 0,
+    cache_creation_input_tokens: 0,
+    reasoning_output_tokens: 0,
+  });
+  assert.equal(cost, 35); // 5 (input) + 30 (output)
+});
+
 test("index: getModelPricing resolves Claude Opus 4.8 aliases from CURATED", async () => {
   pricing.resetPricingForTests();
   const cachePath = tmpCachePath();

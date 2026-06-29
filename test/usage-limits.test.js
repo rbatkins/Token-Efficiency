@@ -20,6 +20,20 @@ const {
   fetchAntigravityLimits,
 } = require("../src/lib/usage-limits");
 
+// Match a fetch URL by host (exact or subdomain) rather than substring, so the
+// filter can't be fooled by lookalike hosts — and so CodeQL's
+// incomplete-url-substring-sanitization rule stays quiet.
+function urlHostMatches(value, domain) {
+  if (typeof value !== "string") return false;
+  let host;
+  try {
+    host = new URL(value).hostname;
+  } catch {
+    return false;
+  }
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
 describe("extractGeminiOauthClientCredentials", () => {
   it("finds OAuth constants from bundled Gemini CLI chunk files", async () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tokentracker-gemini-bundle-"));
@@ -88,6 +102,36 @@ describe("extractGeminiOauthClientCredentials", () => {
         clientId: "fallback-client.apps.googleusercontent.com",
         clientSecret: "fallback-secret",
       });
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to the public Gemini CLI OAuth client when gemini-cli is not installed (issue #224)", async () => {
+    // Reproduces the native-Antigravity ("agy") case: no `gemini` on PATH and
+    // no gemini-cli bundle under home. Previously this returned null and the
+    // token refresh threw "Could not find Gemini CLI OAuth configuration".
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tokentracker-gemini-none-"));
+    try {
+      const home = path.join(tmp, "home");
+      fs.mkdirSync(home, { recursive: true });
+
+      const result = await extractGeminiOauthClientCredentials({
+        home,
+        commandRunner() {
+          return { status: 1, stdout: "" };
+        },
+      });
+
+      assert.ok(result, "expected a fallback credential, not null");
+      assert.equal(
+        result.clientId,
+        "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com",
+      );
+      assert.ok(
+        typeof result.clientSecret === "string" && result.clientSecret.length > 0,
+        "expected a non-empty client secret",
+      );
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
@@ -1202,7 +1246,7 @@ describe("getUsageLimits", () => {
     resetUsageLimitsCache();
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tokentracker-limits-429-"));
     try {
-      let calls = 0;
+      const urls = [];
       const result = await getUsageLimits({
         home: tmp,
         platform: "darwin",
@@ -1216,8 +1260,8 @@ describe("getUsageLimits", () => {
         commandRunner() {
           return { status: 1, stdout: "" };
         },
-        fetchImpl() {
-          calls += 1;
+        fetchImpl(url) {
+          urls.push(url);
           return Promise.resolve({
             status: 429,
             ok: false,
@@ -1226,7 +1270,12 @@ describe("getUsageLimits", () => {
         },
       });
 
-      assert.equal(calls, 1);
+      // Claude is the only provider this test cares about; the rest of the
+      // fetchImpl calls come from other providers that get scheduled in
+      // parallel (notably OpenCode Go when OPENCODE_GO_WORKSPACE_ID is set
+      // in the test env, e.g. the dev's local .env.local).
+      const claudeCalls = urls.filter((u) => urlHostMatches(u, "anthropic.com"));
+      assert.equal(claudeCalls.length, 1);
       assert.equal(result.claude.configured, true);
       assert.match(result.claude.error, /rate limited/);
     } finally {
@@ -1331,10 +1380,15 @@ describe("getUsageLimits", () => {
         },
       });
 
-      assert.equal(calls[0].url, "https://auth.kimi.com/api/oauth/token");
-      assert.match(calls[0].body, /grant_type=refresh_token/);
-      assert.match(calls[0].body, /refresh_token=refresh-kimi-token/);
-      assert.equal(calls[1].authorization, "Bearer fresh-kimi-token");
+      // Other providers (e.g. OpenCode Go when OPENCODE_GO_WORKSPACE_ID is
+      // set in the test process env) may schedule their own fetchImpl calls
+      // in parallel; pick the Kimi ones by URL so the assertions don't
+      // depend on Promise.all slot order.
+      const kimiCalls = calls.filter((c) => urlHostMatches(c.url, "kimi.com"));
+      assert.equal(kimiCalls[0].url, "https://auth.kimi.com/api/oauth/token");
+      assert.match(kimiCalls[0].body, /grant_type=refresh_token/);
+      assert.match(kimiCalls[0].body, /refresh_token=refresh-kimi-token/);
+      assert.equal(kimiCalls[1].authorization, "Bearer fresh-kimi-token");
       assert.equal(result.kimi.error, null);
       assert.equal(result.kimi.primary_window.used_percent, 40);
 

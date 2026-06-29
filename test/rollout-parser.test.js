@@ -1383,7 +1383,7 @@ function fakeZcodeSqliteOptions(dbPath, messages) {
   };
 }
 
-test("readZcodeDbMessages keeps only Z.ai/BigModel rows, drops bundled sub-agent turns", async () => {
+test("readZcodeDbMessages keeps Z.ai/BigModel + third-party rows, drops bundled sub-agent turns", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tokentracker-zcode-db-"));
   try {
     const dbPath = path.join(tmp, "db.sqlite");
@@ -1398,18 +1398,28 @@ test("readZcodeDbMessages keeps only Z.ai/BigModel rows, drops bundled sub-agent
       // ZCode-native (its own GLM agent via Z.ai / BigModel) — KEEP
       { ...buildOpencodeMessage({ ...base, modelID: "GLM-5.2" }), id: "z1", sessionID: "s1", providerID: "builtin:zai-start-plan" },
       { ...buildOpencodeMessage({ ...base, modelID: "GLM-5-Turbo" }), id: "z2", sessionID: "s1", providerID: "builtin:bigmodel-coding-plan" },
+      // Custom providers the user adds to ZCode (a built-in feature beyond the
+      // Z.ai plan subscription) get a random UUID as providerID — NOT a vendor
+      // name. Observed on a real box: mimo-v2.5-pro under UUID "265956bf-…". An
+      // allowlist of vendor keywords can never match a UUID, so these turns must
+      // be KEEP-by-default or they go uncounted entirely (issue #216).
+      { ...buildOpencodeMessage({ ...base, modelID: "mimo-v2.5-pro" }), id: "m1", sessionID: "s5", providerID: "265956bf-e1b9-491d-879a-28a7944ff1b9" },
+      { ...buildOpencodeMessage({ ...base, modelID: "fugu-ultra" }), id: "f1", sessionID: "s4", providerID: "a1b2c3d4-0000-4000-8000-000000000000" },
       // Bundled sub-agents ZCode can orchestrate — already counted by the
-      // standalone Claude/Codex parsers, so DROP (anthropic/openai providerID).
+      // standalone Claude/Codex/Gemini parsers, so DROP
+      // (anthropic/openai/google providerID).
       { ...buildOpencodeMessage({ ...base, modelID: "claude-opus-4-8" }), id: "a1", sessionID: "s2", providerID: "anthropic" },
       { ...buildOpencodeMessage({ ...base, modelID: "gpt-5.2-codex" }), id: "o1", sessionID: "s3", providerID: "openai" },
+      { ...buildOpencodeMessage({ ...base, modelID: "gemini-3-pro" }), id: "g1", sessionID: "s6", providerID: "google" },
     ];
 
     const rows = readZcodeDbMessages(dbPath, fakeZcodeSqliteOptions(dbPath, messages));
-    assert.equal(rows.length, 2);
-    const providers = rows.map((r) => r.data.providerID).sort();
-    assert.deepEqual(providers, ["builtin:bigmodel-coding-plan", "builtin:zai-start-plan"]);
-    // No anthropic/openai turn survives the native filter.
-    assert.ok(!rows.some((r) => /anthropic|openai/.test(r.data.providerID)));
+    assert.equal(rows.length, 4);
+    // GLM-native + both UUID-keyed custom-provider third-party models survive.
+    const models = rows.map((r) => r.data.modelID).sort();
+    assert.deepEqual(models, ["GLM-5-Turbo", "GLM-5.2", "fugu-ultra", "mimo-v2.5-pro"]);
+    // No bundled anthropic/openai/google sub-agent turn survives the filter.
+    assert.ok(!rows.some((r) => /anthropic|openai|google/.test(r.data.providerID)));
   } finally {
     await fs.rm(tmp, { recursive: true, force: true });
   }

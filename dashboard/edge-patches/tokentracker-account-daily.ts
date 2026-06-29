@@ -232,6 +232,12 @@ const MODEL_PRICING: Record<string, { input: number; output: number; cache_read:
   "mimo-v2.5-pro": { input: 1, output: 3, cache_read: 0.2 },
   "mimo-v2.5": { input: 0.4, output: 2, cache_read: 0.08 },
   "mimo-v2-flash": { input: 0.1, output: 0.3, cache_read: 0.02 },
+  // ── Sakana Fugu (OpenAI-compatible API via sakana.ai PAYG / OpenRouter,
+  //    used through Codex/Cursor/Cline/ZCode etc.; mirrored from
+  //    src/lib/pricing/curated-overrides.json). OpenRouter rate: $5/$30 per
+  //    MTok in/out, cache_read $0.5/M; no cache-write surcharge so
+  //    cache_write = input. ──
+  "sakana/fugu-ultra": { input: 5, output: 30, cache_read: 0.5, cache_write: 5 },
 };
 const ZERO_PRICING = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
 
@@ -302,6 +308,7 @@ function getModelPricing(model: string) {
   if (lower.includes("kiro")) return MODEL_PRICING["kiro-cli-agent"];
   if (lower.includes("hy3")) return MODEL_PRICING["hy3-preview-agent"];
   if (lower.includes("composer")) return MODEL_PRICING["composer-1"];
+  if (lower.includes("fugu")) return MODEL_PRICING["sakana/fugu-ultra"];
   if (lower === "auto") return MODEL_PRICING["composer-1"];
   return ZERO_PRICING;
 }
