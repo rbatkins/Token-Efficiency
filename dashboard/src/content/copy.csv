@@ -969,3 +969,13 @@ skills.usage.months_ago,ui,SkillsPage,SkillDetailPanel,usage_months_ago,"{{month
 skills.usage.unknown,ui,SkillsPage,SkillDetailPanel,usage_unknown,"Unknown",,active
 skills.usage.unused,ui,SkillsPage,SkillDetailPanel,usage_unused,"Not invoked yet. Possible dead weight if you never use it.",,active
 skills.usage.disclaimer,ui,SkillsPage,SkillDetailPanel,usage_disclaimer,"Counts from Claude transcripts. Cost is the approximate spend of turns that invoked this skill.",,active
+quality.card.title,ui,DashboardPage,QualityPerDollarCard,title,"Quality per dollar",,active
+quality.card.subtitle,ui,DashboardPage,QualityPerDollarCard,subtitle,"Accepted outcomes per dollar — not lines of code",,active
+quality.card.loading,ui,DashboardPage,QualityPerDollarCard,loading,"Computing…",,active
+quality.card.error,ui,DashboardPage,QualityPerDollarCard,error,"Couldn't load the quality metric.",,active
+quality.card.empty,ui,DashboardPage,QualityPerDollarCard,empty,"No accepted outcomes yet — run the merged-PR backfill to populate this.",,active
+quality.card.dollars_per_outcome,ui,DashboardPage,QualityPerDollarCard,dollars_per_outcome,"$ / accepted outcome",,active
+quality.card.accepted,ui,DashboardPage,QualityPerDollarCard,accepted,"Accepted outcomes",,active
+quality.card.basis_list,ui,DashboardPage,QualityPerDollarCard,basis_list,"list-price",,active
+quality.card.basis_sub,ui,DashboardPage,QualityPerDollarCard,basis_sub,"subscription",,active
+quality.card.footnote,ui,DashboardPage,QualityPerDollarCard,footnote,"Across {{days}}d, on {{basis}} cost. Numerator is accepted outcomes, never lines of code.",,active

@@ -729,6 +729,24 @@ async function handleLocalApi(req, res, url) {
     return true;
   }
 
+  // quality-per-dollar — reuse the CLI engine so dev matches production
+  if (pathname === "/functions/tokentracker-quality-per-dollar") {
+    const sub = Number(url.searchParams.get("sub")) || undefined;
+    const qFrom = url.searchParams.get("from") || undefined;
+    const qTo = url.searchParams.get("to") || undefined;
+    const { computeQualityPerDollar } = require("../src/lib/quality");
+    computeQualityPerDollar({ from: qFrom, to: qTo, subscriptionMonthlyUsd: sub })
+      .then((result) => {
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify(result));
+      })
+      .catch((e) => {
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ error: e?.message || "compute_failed" }));
+      });
+    return true;
+  }
+
   // 处理 usage-model-breakdown
   if (pathname === "/functions/tokentracker-usage-model-breakdown") {
     const from = url.searchParams.get("from") || "";

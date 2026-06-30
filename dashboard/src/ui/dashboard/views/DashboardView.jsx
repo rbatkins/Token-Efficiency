@@ -5,6 +5,7 @@ import { CostAnalysisModal } from "../components/CostAnalysisModal.jsx";
 import { DataDetails } from "../components/DataDetails.jsx";
 import { StatsPanel } from "../components/StatsPanel.jsx";
 import { UsageOverview } from "../components/UsageOverview.jsx";
+import { QualityPerDollarCard } from "../components/QualityPerDollarCard.jsx";
 import { TrendMonitor } from "../components/TrendMonitor.jsx";
 import { FadeIn } from "../../foundation/FadeIn.jsx";
 import { MacAppBanner } from "../components/MacAppBanner.jsx";
@@ -349,6 +350,8 @@ export function DashboardView(props) {
                     to={usageTo}
                   />
                 </FadeIn>
+
+                {!screenshotMode ? <QualityPerDollarCard /> : null}
 
                 {!screenshotMode ? (
                   <FadeIn delay={D_DATA_DETAILS}>
