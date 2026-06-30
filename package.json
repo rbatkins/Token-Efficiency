@@ -38,7 +38,9 @@
     "validate:copy": "node scripts/validate-copy-registry.cjs",
     "validate:guardrails": "node scripts/validate-architecture-guardrails.cjs",
     "validate:retros": "node scripts/validate-retros.cjs",
-    "validate:ui-hardcode": "node scripts/ops/validate-ui-hardcode.cjs"
+    "validate:ui-hardcode": "node scripts/ops/validate-ui-hardcode.cjs",
+    "sync-versions": "node scripts/sync-versions.cjs",
+    "version": "node scripts/sync-versions.cjs && git add TokenTrackerBar/project.yml TokenTrackerWin/TokenTrackerWin.csproj"
   },
   "dependencies": {
     "@mongodb-js/zstd": "^2.0.1",
