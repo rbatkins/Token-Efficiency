@@ -12,6 +12,8 @@ Auto-collect token counts from **22 AI coding tools**, aggregate them locally, a
 
 > **What's different about Token-Efficiency?** This fork keeps all of TokenTracker's local-first tracking and adds **Effective Tokens (ET)**, **task-type attribution**, **subscription/limit probing**, and **code-quality-per-dollar** metrics. It is designed to be the memory layer for coding agents who need to answer "what did the tokens buy?"
 
+📐 **Design:** [QUALITY-PER-DOLLAR.md](./QUALITY-PER-DOLLAR.md) — what counts as quality here (accepted outcomes, **not** lines of code), and how the quality-per-dollar metric is computed.
+
 [![npm version](https://img.shields.io/npm/v/tokentracker-cli.svg?color=blue)](https://www.npmjs.com/package/tokentracker-cli)
 [![npm downloads](https://img.shields.io/npm/dm/tokentracker-cli.svg?color=brightgreen)](https://www.npmjs.com/package/tokentracker-cli)
 [![Homebrew](https://img.shields.io/github/v/release/mm7894215/TokenTracker?label=brew&color=F8B73E&logo=homebrew&logoColor=white)](https://github.com/mm7894215/homebrew-tokentracker)
