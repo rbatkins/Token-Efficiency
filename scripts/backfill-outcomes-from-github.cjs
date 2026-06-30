@@ -39,13 +39,19 @@ async function main() {
   const file = path.join(paths.trackerDir, "outcomes.jsonl");
 
   // De-dup against anything already backfilled (idempotent re-runs).
+  // Read directly and tolerate a missing file rather than check-then-read,
+  // which is a TOCTOU race (the file can vanish between existsSync and read).
   const seen = new Set();
-  if (fs.existsSync(file)) {
-    for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
-      const t = line.trim();
-      if (!t) continue;
-      try { seen.add(JSON.parse(t).story_id); } catch { /* skip */ }
-    }
+  let existing = "";
+  try {
+    existing = fs.readFileSync(file, "utf8");
+  } catch (e) {
+    if (e.code !== "ENOENT") throw e;
+  }
+  for (const line of existing.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t) continue;
+    try { seen.add(JSON.parse(t).story_id); } catch { /* skip */ }
   }
 
   const records = [];
