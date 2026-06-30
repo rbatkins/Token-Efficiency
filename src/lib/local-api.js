@@ -1658,6 +1658,23 @@ function createLocalApiHandler({ queuePath }) {
       return true;
     }
 
+    // --- quality-per-dollar ---
+    // Accepted outcomes / effective $ (see QUALITY-PER-DOLLAR.md). Numerator
+    // is an accepted OUTCOME, never lines of code. Outcomes optional.
+    if (p === "/functions/tokentracker-quality-per-dollar") {
+      const sub = Number(url.searchParams.get("sub")) || undefined;
+      const from = url.searchParams.get("from") || undefined;
+      const to = url.searchParams.get("to") || undefined;
+      try {
+        const { computeQualityPerDollar } = require("./quality");
+        const result = await computeQualityPerDollar({ from, to, subscriptionMonthlyUsd: sub });
+        json(res, result);
+      } catch (e) {
+        json(res, { error: String((e && e.message) || e) });
+      }
+      return true;
+    }
+
     // --- usage-model-breakdown ---
     if (p === "/functions/tokentracker-usage-model-breakdown") {
       const from = url.searchParams.get("from") || "";

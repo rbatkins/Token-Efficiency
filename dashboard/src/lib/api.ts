@@ -28,6 +28,7 @@ const PATHS = {
   userStatus: "tokentracker-user-status",
   localSync: "tokentracker-local-sync",
   usageLimits: "tokentracker-usage-limits",
+  qualityPerDollar: "tokentracker-quality-per-dollar",
 };
 
 /**
@@ -417,6 +418,28 @@ export async function getUsageModelBreakdown({
   const tzParams = buildTimeZoneParams({ timeZone, tzOffsetMinutes });
   const filterParams = buildFilterParams({ source });
   return fetchLocalJson(PATHS.usageModelBreakdown, { from, to, ...filterParams, ...tzParams }, { accessToken });
+}
+
+export async function getQualityPerDollar({
+  from,
+  to,
+  subscriptionMonthlyUsd,
+  accessToken,
+}: AnyRecord = {}) {
+  if (isMockEnabled()) {
+    return {
+      window: { from: null, to: null, days: 0 },
+      denominator: { basis: "list_price", effective_usd: 0, list_price_usd: 0, subscription_monthly_usd: null },
+      numerator: { accepted_outcomes: 0, model_tagged: 0, avg_iterations: null },
+      quality_per_dollar: { dollars_per_accepted_outcome: null, accepted_outcomes_per_1k_usd: null },
+      per_model: [],
+    };
+  }
+  const params: AnyRecord = {};
+  if (from) params.from = from;
+  if (to) params.to = to;
+  if (subscriptionMonthlyUsd) params.sub = subscriptionMonthlyUsd;
+  return fetchLocalJson(PATHS.qualityPerDollar, params, { accessToken });
 }
 
 export async function getUsageCategoryBreakdown({
