@@ -176,6 +176,8 @@
   "limits.label.antigravity_gemini_5h": "Gm 5h",
   "limits.label.antigravity_live": "live",
   "limits.label.antigravity_cached": "cached",
+  "limits.tooltip.antigravity_live": "실행 중인 로컬 Antigravity 프로세스에서 직접 가져온 실시간 제한입니다。",
+  "limits.tooltip.antigravity_cached": "캐시된 제한입니다. 업데이트하려면 Antigravity IDE/CLI를 실행하세요。",
   "limits.bar.sub_one_percent": "<1",
   "limits.status.not_connected": "연결되지 않음",
   "limits.status.no_data": "실시간 한도 데이터가 반환되지 않았습니다",

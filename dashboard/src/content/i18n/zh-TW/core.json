@@ -176,6 +176,8 @@
   "limits.label.antigravity_gemini_5h": "Gm 5h",
   "limits.label.antigravity_live": "live",
   "limits.label.antigravity_cached": "cached",
+  "limits.tooltip.antigravity_live": "即時額度，直接獲取自本地運行的 Antigravity 進程。",
+  "limits.tooltip.antigravity_cached": "快取的額度。啟動 Antigravity IDE/CLI 以重新整理。",
   "limits.bar.sub_one_percent": "<1",
   "limits.status.not_connected": "未連線",
   "limits.status.no_data": "未返回即時限額資料",

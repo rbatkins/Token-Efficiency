@@ -176,6 +176,8 @@
   "limits.label.antigravity_gemini_5h": "Gm 5h",
   "limits.label.antigravity_live": "live",
   "limits.label.antigravity_cached": "cached",
+  "limits.tooltip.antigravity_live": "稼働中のローカルの Antigravity プロセスから直接取得したリアルタイムの制限値です。",
+  "limits.tooltip.antigravity_cached": "キャッシュされた制限値。更新するには Antigravity IDE/CLI を実行してください。",
   "limits.bar.sub_one_percent": "<1",
   "limits.status.not_connected": "未接続",
   "limits.status.no_data": "リアルタイムの制限データが返されませんでした",

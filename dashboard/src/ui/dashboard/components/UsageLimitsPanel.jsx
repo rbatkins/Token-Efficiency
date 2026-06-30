@@ -341,12 +341,33 @@ function renderProviderGroup(id, data, mode, expanded, onToggle) {
     if (data.cached) {
       const suffix = ago(data.cached_at);
       badge = (
-        <span className="ml-1.5 text-[10px] text-oai-gray-400 dark:text-oai-gray-500 bg-oai-gray-100 dark:bg-oai-gray-800 px-1.5 py-0.5 rounded leading-normal">
-          {copy("limits.label.antigravity_cached")}{suffix ? <>&nbsp;·&nbsp;{suffix}</> : null}
-        </span>
+        <div className="relative inline-flex items-center group cursor-help ml-1" onClick={(e) => e.stopPropagation()}>
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-oai-gray-100 dark:bg-oai-gray-800 border border-oai-gray-200/50 dark:border-oai-gray-700/50 text-oai-gray-500 dark:text-oai-gray-400 leading-normal">
+            <span className="h-1 w-1 rounded-full bg-oai-gray-400 dark:bg-oai-gray-500" />
+            {copy("limits.label.antigravity_cached")}{suffix ? <>&nbsp;·&nbsp;{suffix}</> : null}
+          </span>
+          <span className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 -translate-x-1/2 w-48 rounded-md bg-oai-gray-900 dark:bg-oai-gray-800 px-2.5 py-1.5 text-[10px] font-normal text-white text-center opacity-0 scale-95 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 transition-all duration-200 cubic-bezier(0.16, 1, 0.3, 1) leading-normal shadow-lg origin-bottom border border-oai-gray-800 dark:border-oai-gray-700">
+            {copy("limits.tooltip.antigravity_cached")}
+            <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-oai-gray-900 dark:border-t-oai-gray-800" />
+          </span>
+        </div>
       );
     } else {
-      badge = <span className="ml-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded leading-normal">{copy("limits.label.antigravity_live")}</span>;
+      badge = (
+        <div className="relative inline-flex items-center group cursor-help ml-1" onClick={(e) => e.stopPropagation()}>
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 leading-normal">
+            <span className="relative flex h-1 w-1">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-1 w-1 bg-emerald-500" />
+            </span>
+            {copy("limits.label.antigravity_live")}
+          </span>
+          <span className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 -translate-x-1/2 w-48 rounded-md bg-oai-gray-900 dark:bg-oai-gray-800 px-2.5 py-1.5 text-[10px] font-normal text-white text-center opacity-0 scale-95 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 transition-all duration-200 cubic-bezier(0.16, 1, 0.3, 1) leading-normal shadow-lg origin-bottom border border-oai-gray-800 dark:border-oai-gray-700">
+            {copy("limits.tooltip.antigravity_live")}
+            <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-oai-gray-900 dark:border-t-oai-gray-800" />
+          </span>
+        </div>
+      );
     }
   }
   return renderConfiguredProvider(id, data, title, mode, expanded, onToggle, badge);
