@@ -33,6 +33,8 @@
     "kimi-k2.5":        { "input": 0.6,  "output": 2,    "cache_read": 0.15 },
     "kimi-k2.5-free":   { "input": 0,    "output": 0,    "cache_read": 0 },
     "kimi-k2.6":        { "input": 0.95, "output": 4,    "cache_read": 0.16 },
+    "kimi-k2.7-code":   { "input": 0.95, "output": 4,    "cache_read": 0.19, "note": "Vendor-exact per Moonshot platform.kimi.ai/docs/pricing/chat-k27-code (verified 2026-07-09): 0.95/4, cache-hit 0.19. Without this, the 'kimi' fuzzy rule mis-resolves k2.7-code to kimi-k2.5 (0.6/2/0.15), ~2x low on output." },
+    "glm-5.2":          { "input": 1.4,  "output": 4.4,  "cache_read": 0.26, "note": "Vendor-exact per Z.ai docs.z.ai/guides/overview/pricing (verified 2026-07-09): 1.4/4.4, cached input 0.26. Without this, fuzzy 'glm-5' mis-resolves 5.2 to glm-5 (1.0/3.2/0.2), ~30% low." },
     "glm-5.1":          { "input": 1.4,  "output": 4.4,  "cache_read": 0.26 },
     "glm-5":            { "input": 1.0,  "output": 3.2,  "cache_read": 0.2 },
     "glm-5-turbo":      { "input": 1.2,  "output": 4.0,  "cache_read": 0.24 },
@@ -64,6 +66,8 @@
     { "match": "minimax-m2.7",           "ref": "MiniMax-M2.7" },
     { "match": "deepseek-v4-flash",      "ref": "deepseek-v4-flash" },
     { "match": "deepseek-v4-pro",        "ref": "deepseek-v4-pro" },
+    { "match": "kimi-k2.7-code",         "ref": "kimi-k2.7-code" },
+    { "match": "kimi-k2.7",              "ref": "kimi-k2.7-code" },
     { "match": "kimi-k2.6",              "ref": "kimi-k2.6" },
     { "match": "kimi",                   "ref": "kimi-k2.5" },
     { "match": "glm-4.5-airx",           "ref": "glm-4.5-airx" },
@@ -76,6 +80,7 @@
     { "match": "glm-4.7",                "ref": "glm-4.7" },
     { "match": "glm-4.6",                "ref": "glm-4.6" },
     { "match": "glm-5-turbo",            "ref": "glm-5-turbo" },
+    { "match": "glm-5.2",                "ref": "glm-5.2" },
     { "match": "glm-5.1",                "ref": "glm-5.1" },
     { "match": "glm-5",                  "ref": "glm-5" }
   ]
