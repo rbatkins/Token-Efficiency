@@ -44,7 +44,7 @@
   },
   "dependencies": {
     "@mongodb-js/zstd": "^2.0.1",
-    "undici": "^8.2.0"
+    "undici": "^8.11.2"
   },
   "devDependencies": {
     "@sourcegraph/scip-typescript": "^0.4.0",
